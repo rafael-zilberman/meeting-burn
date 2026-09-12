@@ -1,0 +1,38 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-workspace
+
+# Tooling / agents
+.claude/
+
+# Dependencies & build output (none today — here so they never sneak in)
+node_modules/
+dist/
+build/
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# Env
+.env
+.env.local
