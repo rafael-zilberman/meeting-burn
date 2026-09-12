@@ -99,6 +99,7 @@ python3 scripts/verify.py   # the same check CI runs
 ## Project docs
 
 - [Contributing guide](CONTRIBUTING.md) — setup, the one hard rule, how to test
+- [AGENTS.md](AGENTS.md) — conventions and workflow for AI coding agents
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 - [Security policy](SECURITY.md) — how to report a vulnerability privately
 - [Changelog](CHANGELOG.md)
