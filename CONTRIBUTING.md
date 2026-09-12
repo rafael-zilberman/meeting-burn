@@ -80,6 +80,12 @@ evening on something that turns out to be off-scope. Good candidates: pause/resu
 meeting history, cost-per-attendee breakdowns, sharing. Off-scope: accounts,
 backends, analytics, anything that phones home.
 
+## Using an AI agent?
+
+If you're working through Claude Code, Copilot, Cursor or similar, point it at
+[AGENTS.md](AGENTS.md) — it covers branching, commit style, how to handle Dependabot
+PRs, and the conventions this file describes, in a form agents follow reliably.
+
 ## Code of conduct
 
 By participating, you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
