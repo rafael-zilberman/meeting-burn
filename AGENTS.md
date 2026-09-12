@@ -209,6 +209,11 @@ surrounding code.
 - Elapsed time comes from `Date.now()` deltas, never from an accumulating counter.
   This is deliberate: it keeps the total correct when the tab is throttled or
   backgrounded. Don't "simplify" it into a `setInterval` tally.
+- A meeting is a series of counted segments: `accumulated` banks the milliseconds
+  from finished segments, `segmentAt` marks when the current one began, and
+  `elapsedMs()` is the only thing that should read them. Pausing adds the live
+  segment to `accumulated`; resuming resets `segmentAt`. Never subtract a "paused
+  duration" after the fact — that's how drift gets in.
 - Settings persist under the `mct.settings.v2` key. **If you change the shape or
   meaning of a stored field, bump the key version.** A stale value reinterpreted
   under new semantics silently corrupts every number the app shows — this already
@@ -218,8 +223,8 @@ surrounding code.
 
 **Accessibility**
 - Icon-only buttons need an `aria-label`; `verify.py` checks this.
-- Keep the keyboard controls working: `Space` start/stop, arrows for headcount,
-  `Esc` to close settings.
+- Keep the keyboard controls working: `Space` starts, then pauses/resumes; `Enter`
+  ends the meeting; arrows adjust headcount; `Esc` closes settings.
 
 ---
 
@@ -231,6 +236,8 @@ flow, verify by hand and describe what you did:
 
 - Start → run → stop, and confirm the total matches
   `people × (salary / hours / 3600) × seconds`
+- Pause mid-meeting, wait, resume, then stop — the paused interval must not appear
+  in either the cost or the duration
 - Change currency and salary, reload, confirm persistence
 - Keyboard controls
 - ~375px and a wide viewport

@@ -23,14 +23,17 @@ it's still happening, which is the only moment the information is useful.
 ## Features
 
 - **Live counter** — the cost updates continuously, not once per second.
+- **Pause and resume** — step out, take the call, come back. Paused time isn't
+  billed, and the total only ever counts the minutes the meeting was actually
+  running.
 - **Configurable rate** — median *monthly* salary and working hours per month.
 - **9 currencies** — ILS, USD, EUR, GBP, CAD, AUD, INR, JPY, BRL. Amounts are
   formatted with `Intl.NumberFormat`, so separators follow the viewer's locale.
 - **Summary** — duration, headcount, cost per person, and a copyable one-liner
   for pasting into Slack.
 - **Settings persist** in `localStorage`. Set it once.
-- **Keyboard-driven** — `Space` starts and stops, `↑ ↓` adjust headcount, `Esc`
-  closes settings.
+- **Keyboard-driven** — `Space` starts the meeting and then pauses/resumes it,
+  `Enter` ends it, `↑ ↓` adjust headcount, `Esc` closes settings.
 - **Zero dependencies.** One HTML file. No build step, no npm install, no tracking,
   no network calls of any kind.
 
@@ -50,8 +53,11 @@ Then open <http://localhost:4187>.
 
 ```
 costPerPersonPerSecond = monthlySalary / workingHoursPerMonth / 3600
-totalCost              = costPerPersonPerSecond × people × elapsedSeconds
+totalCost              = costPerPersonPerSecond × people × countedSeconds
 ```
+
+`countedSeconds` is time the meeting was actually running — pauses are excluded, so
+the duration on the summary screen is billable time, not wall-clock time.
 
 Defaults are **₪20,000/month** across **182 hours** (the standard Israeli work
 month) for **5 people** — about **₪9.16 per minute**.
@@ -62,7 +68,8 @@ Two notes on accuracy:
   overhead typically add 25–50% on top of gross pay. If you enter a raw salary, the
   number you see is an underestimate.
 - **Elapsed time comes from wall-clock timestamps**, not an accumulating counter, so
-  the total stays correct even if the tab is backgrounded or throttled.
+  the total stays correct even if the tab is backgrounded or throttled. Pausing banks
+  the current segment and stops the clock; resuming starts a new one.
 
 ## Configuration
 
