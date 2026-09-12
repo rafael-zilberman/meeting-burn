@@ -1,0 +1,61 @@
+name: Bug report
+description: Something doesn't work the way it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. The most useful bug reports include the exact
+        settings you were using — that's usually enough to reproduce it.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did you get instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Set salary to ... and headcount to ...
+        2. Start the meeting
+        3. After ~30 seconds, ...
+    validations:
+      required: true
+
+  - type: input
+    id: settings
+    attributes:
+      label: Settings in use
+      description: Salary, working hours, currency and headcount.
+      placeholder: "₪20,000 / 182 h / ILS / 5 people"
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and OS
+      placeholder: "Chrome 131 on macOS 15"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: how-opened
+    attributes:
+      label: How were you running it?
+      options:
+        - The hosted demo (GitHub Pages)
+        - A local server
+        - Opening index.html directly from disk
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console errors
+      description: Anything red in the browser devtools console. Optional.
+      render: text

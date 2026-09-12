@@ -6,6 +6,10 @@ Set how many people are in the room, hit start, and a live counter ticks upward 
 every second the meeting runs. Stop it and you get the damage — total, per person,
 and a comment you probably deserved.
 
+[![CI](https://github.com/rafael-zilberman/meeting-burn/actions/workflows/ci.yml/badge.svg)](https://github.com/rafael-zilberman/meeting-burn/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Dependencies: none](https://img.shields.io/badge/dependencies-none-brightgreen.svg)](#)
+
 🔗 **[Live demo](https://rafael-zilberman.github.io/meeting-burn/)**
 
 ---
@@ -84,7 +88,20 @@ background and all transitions are disabled.
 
 Issues and pull requests are welcome. The entire app is one file, so changes are
 easy to read and easy to review. Please keep it that way: **no build step and no
-runtime dependencies.**
+runtime dependencies** — CI enforces it.
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) first, then:
+
+```bash
+python3 scripts/verify.py   # the same check CI runs
+```
+
+## Project docs
+
+- [Contributing guide](CONTRIBUTING.md) — setup, the one hard rule, how to test
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security policy](SECURITY.md) — how to report a vulnerability privately
+- [Changelog](CHANGELOG.md)
 
 ## License
 

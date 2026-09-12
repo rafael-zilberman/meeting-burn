@@ -1,0 +1,41 @@
+name: Feature request
+description: Suggest an idea for Meeting Burn
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before writing: this project is deliberately **one HTML file with no build
+        step and no dependencies**. Ideas that need a framework, a bundler or a
+        backend won't be accepted, no matter how good. Everything else is fair game.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the problem?
+      description: Describe the situation where the app falls short today.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      description: Optional.
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Scope check
+      options:
+        - label: This can be done without adding a build step or any dependency
+          required: true
+        - label: This doesn't require a backend, an account, or sending data anywhere
+          required: true
