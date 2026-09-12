@@ -165,6 +165,18 @@
   .money .amount .cents{ font-size:.46em; opacity:.62; letter-spacing:-.02em; margin-left:.06em; vertical-align:.42em; }
   .hot .amount{ background:linear-gradient(175deg,#fff 10%, #fecdd3 55%, #fb7185); text-shadow:0 0 70px rgba(251,113,133,.4); }
 
+  .run-actions{ display:flex; gap:10px; }
+  .run-actions .btn{ flex:1; }
+  .btn.pause{ background:var(--glass); color:var(--ink-dim); box-shadow:0 0 0 1px var(--stroke) inset; }
+  .btn.pause:hover{ color:var(--ink); background:var(--glass-2); box-shadow:0 0 0 1px rgba(255,255,255,.24) inset; }
+
+  /* paused: freeze the motion, cool the colour, keep the number readable */
+  .paused .pulse{ background:var(--amber); animation:none; box-shadow:0 0 0 4px rgba(251,191,36,.16); }
+  .paused .bar i{ animation-play-state:paused; opacity:.35; }
+  .paused .money .amount{ opacity:.5; }
+  .paused .btn.pause{ background:rgba(251,191,36,.14); color:var(--amber); box-shadow:0 0 0 1px rgba(251,191,36,.4) inset; }
+  .money .amount{ transition:opacity .45s var(--ease), text-shadow .4s; }
+
   .bar{ height:3px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden; margin:24px 0 22px; }
   .bar i{ display:block; height:100%; width:40%; border-radius:99px;
     background:linear-gradient(90deg,transparent,var(--violet),var(--teal),transparent); animation:slide 2.4s linear infinite; }
@@ -280,7 +292,7 @@
 
     <!-- ── RUNNING ── -->
     <section class="view" id="viewRun">
-      <div class="live"><span class="pulse"></span><span>In session</span></div>
+      <div class="live"><span class="pulse"></span><span id="liveLabel">In session</span></div>
       <div class="money" id="money"><div class="amount" id="amount">$0<span class="cents">.00</span></div></div>
       <div class="bar"><i></i></div>
       <div class="stats">
@@ -288,10 +300,18 @@
         <div class="stat"><div class="k">People</div><div class="v" id="runPeople">5</div></div>
         <div class="stat"><div class="k">Per min</div><div class="v" id="perMin">$0</div></div>
       </div>
-      <button class="btn stop" id="stop">
-        <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>
-        End meeting
-      </button>
+      <div class="run-actions">
+        <button class="btn pause" id="pause" aria-pressed="false">
+          <svg id="pauseIcon" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="7" y="5" width="3.6" height="14" rx="1.4"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.4"/>
+          </svg>
+          <span id="pauseLabel">Pause</span>
+        </button>
+        <button class="btn stop" id="stop">
+          <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>
+          End meeting
+        </button>
+      </div>
     </section>
 
     <!-- ── SUMMARY ── -->
@@ -391,7 +411,11 @@
 
   /* ───────── state ───────── */
   let people = Math.max(1, Math.min(200, Number(S.people) || 5));
-  let startedAt = 0, endedAt = 0, raf = 0, lastWhole = -1;
+  // A meeting is a series of counted segments. `accumulated` holds the milliseconds
+  // banked by finished segments; `segmentAt` is when the current one began. Cost only
+  // ever derives from wall-clock deltas, so throttled tabs stay accurate.
+  let accumulated = 0, segmentAt = 0, paused = false, raf = 0, lastWhole = -1;
+  const elapsedMs = () => accumulated + (paused ? 0 : Date.now() - segmentAt);
 
   /* ───────── setup view ───────── */
   const elCount = $("count"), elPeople = $("people"), elRate = $("ratePreview");
@@ -435,18 +459,24 @@
     if (whole !== lastWhole) lastWhole = whole;
   }
 
-  function tick(){
-    const secs = (Date.now() - startedAt) / 1000;
+  function paint(){
+    const secs = elapsedMs() / 1000;
     const cost = secs * perSecond();
     paintAmount(cost);
     $("elapsed").textContent = clock(secs);
     elMoney.classList.toggle("hot", cost >= (LUNCH[S.currency] || 15) * 33);
+    return cost;
+  }
+
+  function tick(){
+    paint();
     raf = requestAnimationFrame(tick);
   }
 
   function begin(){
     refreshFmt();
-    startedAt = Date.now(); lastWhole = -1;
+    accumulated = 0; segmentAt = Date.now(); paused = false; lastWhole = -1;
+    setPaused(false);
     $("runPeople").textContent = people;
     $("perMin").textContent = FW.format(perMinute());
     show("viewRun");
@@ -454,10 +484,35 @@
     raf = requestAnimationFrame(tick);
   }
 
+  function setPaused(on){
+    paused = on;
+    $("viewRun").classList.toggle("paused", on);
+    $("liveLabel").textContent = on ? "Paused" : "In session";
+    $("pauseLabel").textContent = on ? "Resume" : "Pause";
+    $("pause").setAttribute("aria-pressed", String(on));
+    $("pauseIcon").innerHTML = on
+      ? '<path d="M8 5.14v13.72a1 1 0 0 0 1.54.84l10.1-6.86a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14z"/>'
+      : '<rect x="7" y="5" width="3.6" height="14" rx="1.4"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.4"/>';
+  }
+
+  function togglePause(){
+    if (paused) {
+      segmentAt = Date.now();
+      setPaused(false);
+      raf = requestAnimationFrame(tick);
+    } else {
+      accumulated += Date.now() - segmentAt;   // bank the segment before stopping the clock
+      cancelAnimationFrame(raf);
+      setPaused(true);
+      paint();
+    }
+  }
+
   function finish(){
+    if (!paused) accumulated += Date.now() - segmentAt;
+    paused = true;
     cancelAnimationFrame(raf);
-    endedAt = Date.now();
-    const secs = (endedAt - startedAt) / 1000;
+    const secs = accumulated / 1000;
     const total = secs * perSecond();
 
     $("total").textContent = F2.format(total);
@@ -486,11 +541,12 @@
   }
 
   $("start").addEventListener("click", begin);
+  $("pause").addEventListener("click", togglePause);
   $("stop").addEventListener("click", finish);
   $("again").addEventListener("click", () => { show("viewSetup"); renderPeople(); });
 
   $("copy").addEventListener("click", async e => {
-    const secs = (endedAt - startedAt) / 1000;
+    const secs = accumulated / 1000;
     const text = `Meeting cost: ${F2.format(secs * perSecond())}\n${people} people · ${clock(secs)} · ${FW.format(perMinute())}/min`;
     try { await navigator.clipboard.writeText(text); e.target.textContent = "Copied ✓"; }
     catch { e.target.textContent = "Copy failed"; }
@@ -550,7 +606,11 @@
     if (e.code === "Space") {
       e.preventDefault();
       if ($("viewSetup").classList.contains("active")) begin();
-      else if ($("viewRun").classList.contains("active")) finish();
+      else if ($("viewRun").classList.contains("active")) togglePause();
+    }
+    if (e.key === "Enter" && $("viewRun").classList.contains("active")) {
+      e.preventDefault();
+      finish();
     }
     if ($("viewSetup").classList.contains("active")) {
       if (e.key === "ArrowUp"   || e.key === "ArrowRight") { e.preventDefault(); nudge(+1); }
