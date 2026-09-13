@@ -159,6 +159,18 @@ header{ display:flex; align-items:center; gap:10px; margin-bottom:30px; position
 .money .amount .cents{ font-size:.46em; opacity:.62; letter-spacing:-.02em; margin-left:.06em; vertical-align:.42em; }
 .hot .amount{ background:linear-gradient(175deg,#fff 10%, #fecdd3 55%, #fb7185); text-shadow:0 0 70px rgba(251,113,133,.4); }
 
+.run-actions{ display:flex; gap:10px; }
+.run-actions .btn{ flex:1; }
+.btn.pause{ background:var(--glass); color:var(--ink-dim); box-shadow:0 0 0 1px var(--stroke) inset; }
+.btn.pause:hover{ color:var(--ink); background:var(--glass-2); box-shadow:0 0 0 1px rgba(255,255,255,.24) inset; }
+
+/* paused: freeze the motion, cool the colour, keep the number readable */
+.paused .pulse{ background:var(--amber); animation:none; box-shadow:0 0 0 4px rgba(251,191,36,.16); }
+.paused .bar i{ animation-play-state:paused; opacity:.35; }
+.paused .money .amount{ opacity:.5; }
+.paused .btn.pause{ background:rgba(251,191,36,.14); color:var(--amber); box-shadow:0 0 0 1px rgba(251,191,36,.4) inset; }
+.money .amount{ transition:opacity .45s var(--ease), text-shadow .4s; }
+
 .bar{ height:3px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden; margin:24px 0 22px; }
 .bar i{ display:block; height:100%; width:40%; border-radius:99px;
   background:linear-gradient(90deg,transparent,var(--violet),var(--teal),transparent); animation:slide 2.4s linear infinite; }

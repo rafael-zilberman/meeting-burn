@@ -49,7 +49,11 @@
 
   /* ───────── state ───────── */
   let people = Math.max(1, Math.min(200, Number(S.people) || 5));
-  let startedAt = 0, endedAt = 0, raf = 0, lastWhole = -1;
+  // A meeting is a series of counted segments. `accumulated` holds the milliseconds
+  // banked by finished segments; `segmentAt` is when the current one began. Cost only
+  // ever derives from wall-clock deltas, so throttled tabs stay accurate.
+  let accumulated = 0, segmentAt = 0, paused = false, raf = 0, lastWhole = -1;
+  const elapsedMs = () => accumulated + (paused ? 0 : Date.now() - segmentAt);
 
   /* ───────── setup view ───────── */
   const elCount = $("count"), elPeople = $("people"), elRate = $("ratePreview");
@@ -93,18 +97,24 @@
     if (whole !== lastWhole) lastWhole = whole;
   }
 
-  function tick(){
-    const secs = (Date.now() - startedAt) / 1000;
+  function paint(){
+    const secs = elapsedMs() / 1000;
     const cost = secs * perSecond();
     paintAmount(cost);
     $("elapsed").textContent = clock(secs);
     elMoney.classList.toggle("hot", cost >= (LUNCH[S.currency] || 15) * 33);
+    return cost;
+  }
+
+  function tick(){
+    paint();
     raf = requestAnimationFrame(tick);
   }
 
   function begin(){
     refreshFmt();
-    startedAt = Date.now(); lastWhole = -1;
+    accumulated = 0; segmentAt = Date.now(); paused = false; lastWhole = -1;
+    setPaused(false);
     $("runPeople").textContent = people;
     $("perMin").textContent = FW.format(perMinute());
     show("viewRun");
@@ -112,10 +122,35 @@
     raf = requestAnimationFrame(tick);
   }
 
+  function setPaused(on){
+    paused = on;
+    $("viewRun").classList.toggle("paused", on);
+    $("liveLabel").textContent = on ? "Paused" : "In session";
+    $("pauseLabel").textContent = on ? "Resume" : "Pause";
+    $("pause").setAttribute("aria-pressed", String(on));
+    $("pauseIcon").innerHTML = on
+      ? '<path d="M8 5.14v13.72a1 1 0 0 0 1.54.84l10.1-6.86a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14z"/>'
+      : '<rect x="7" y="5" width="3.6" height="14" rx="1.4"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.4"/>';
+  }
+
+  function togglePause(){
+    if (paused) {
+      segmentAt = Date.now();
+      setPaused(false);
+      raf = requestAnimationFrame(tick);
+    } else {
+      accumulated += Date.now() - segmentAt;   // bank the segment before stopping the clock
+      cancelAnimationFrame(raf);
+      setPaused(true);
+      paint();
+    }
+  }
+
   function finish(){
+    if (!paused) accumulated += Date.now() - segmentAt;
+    paused = true;
     cancelAnimationFrame(raf);
-    endedAt = Date.now();
-    const secs = (endedAt - startedAt) / 1000;
+    const secs = accumulated / 1000;
     const total = secs * perSecond();
 
     $("total").textContent = F2.format(total);
@@ -144,11 +179,12 @@
   }
 
   $("start").addEventListener("click", begin);
+  $("pause").addEventListener("click", togglePause);
   $("stop").addEventListener("click", finish);
   $("again").addEventListener("click", () => { show("viewSetup"); renderPeople(); });
 
   $("copy").addEventListener("click", async e => {
-    const secs = (endedAt - startedAt) / 1000;
+    const secs = accumulated / 1000;
     const text = `Meeting cost: ${F2.format(secs * perSecond())}\n${people} people · ${clock(secs)} · ${FW.format(perMinute())}/min`;
     try { await navigator.clipboard.writeText(text); e.target.textContent = "Copied ✓"; }
     catch { e.target.textContent = "Copy failed"; }
@@ -208,7 +244,11 @@
     if (e.code === "Space") {
       e.preventDefault();
       if ($("viewSetup").classList.contains("active")) begin();
-      else if ($("viewRun").classList.contains("active")) finish();
+      else if ($("viewRun").classList.contains("active")) togglePause();
+    }
+    if (e.key === "Enter" && $("viewRun").classList.contains("active")) {
+      e.preventDefault();
+      finish();
     }
     if ($("viewSetup").classList.contains("active")) {
       if (e.key === "ArrowUp"   || e.key === "ArrowRight") { e.preventDefault(); nudge(+1); }
