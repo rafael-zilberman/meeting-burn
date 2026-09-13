@@ -26,6 +26,16 @@
   try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} };
 
+  // A popup is torn down the moment it loses focus, so the live meeting is kept
+  // in storage and rebuilt on the next open. Times are absolute epoch ms, which
+  // means a session survives being closed for an hour just as well as a blink.
+  const SKEY = "mct.session.v1";
+  const loadSession = () => { try { return JSON.parse(localStorage.getItem(SKEY) || "null"); } catch { return null; } };
+  const saveSession = phase => {
+    try { localStorage.setItem(SKEY, JSON.stringify({ phase, accumulated, segmentAt, paused, people })); } catch {}
+  };
+  const clearSession = () => { try { localStorage.removeItem(SKEY); } catch {} };
+
   const $ = id => document.getElementById(id);
 
   /* ───────── formatting ───────── */
@@ -111,15 +121,21 @@
     raf = requestAnimationFrame(tick);
   }
 
-  function begin(){
+  function enterRun(){
     refreshFmt();
-    accumulated = 0; segmentAt = Date.now(); paused = false; lastWhole = -1;
-    setPaused(false);
+    setPaused(paused);
     $("runPeople").textContent = people;
     $("perMin").textContent = FW.format(perMinute());
     show("viewRun");
     cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(tick);
+    paint();
+    if (!paused) raf = requestAnimationFrame(tick);
+  }
+
+  function begin(){
+    accumulated = 0; segmentAt = Date.now(); paused = false; lastWhole = -1;
+    enterRun();
+    saveSession("run");
   }
 
   function setPaused(on){
@@ -144,12 +160,19 @@
       setPaused(true);
       paint();
     }
+    saveSession("run");
   }
 
   function finish(){
     if (!paused) accumulated += Date.now() - segmentAt;
     paused = true;
     cancelAnimationFrame(raf);
+    showDone();
+    saveSession("done");
+  }
+
+  function showDone(){
+    refreshFmt();
     const secs = accumulated / 1000;
     const total = secs * perSecond();
 
@@ -181,7 +204,7 @@
   $("start").addEventListener("click", begin);
   $("pause").addEventListener("click", togglePause);
   $("stop").addEventListener("click", finish);
-  $("again").addEventListener("click", () => { show("viewSetup"); renderPeople(); });
+  $("again").addEventListener("click", () => { clearSession(); people = Math.max(1, Math.min(200, Number(S.people) || 5)); show("viewSetup"); renderPeople(); });
 
   $("copy").addEventListener("click", async e => {
     const secs = accumulated / 1000;
@@ -271,4 +294,15 @@
   refreshFmt();
   syncSheet();
   renderPeople();
+
+  const restored = loadSession();
+  if (restored && (restored.phase === "run" || restored.phase === "done")) {
+    accumulated = Number(restored.accumulated) || 0;
+    segmentAt   = Number(restored.segmentAt) || Date.now();
+    paused      = !!restored.paused;
+    people      = Math.max(1, Math.min(200, Number(restored.people) || people));
+    lastWhole   = -1;
+    if (restored.phase === "run") enterRun();
+    else showDone();
+  }
 })();
