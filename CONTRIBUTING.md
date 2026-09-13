@@ -74,6 +74,20 @@ There's no linter, so match what's already there:
 - Prefer clarity over cleverness. Someone should be able to read these files top to
   bottom in one sitting.
 
+## Releases
+
+You don't need to do anything for a release — the maintainer bumps the version and
+pushes a `vX.Y.Z` tag, and CI publishes the extension ZIP. If you want the exact
+package CI would build, at any commit:
+
+```bash
+python3 scripts/package.py zip
+```
+
+It lands in `dist/`, unzips into a folder you can *Load unpacked*, and is the same
+file the Chrome Web Store would receive. If your change adds a file the extension
+needs at runtime, add it to `PACKAGE` in `scripts/package.py` too.
+
 ## Commit messages
 
 Write a short imperative subject line ("Add pause button", not "Added" or "Adds").

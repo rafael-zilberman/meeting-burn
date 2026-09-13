@@ -55,12 +55,15 @@ Then open <http://localhost:4187>.
 
 ## Install as a Chrome extension
 
-The repository is also a Manifest V3 extension. It isn't on the Web Store; load it
-unpacked:
+The repository is also a Manifest V3 extension. It isn't on the Web Store yet, so
+load it unpacked:
 
-1. Clone the repo (the whole folder is the extension — `manifest.json` is at its root).
+1. Download `meeting-burn-<version>.zip` from the
+   [latest release](https://github.com/rafael-zilberman/meeting-burn/releases/latest)
+   and unzip it — or just clone the repo, which works the same way.
 2. Open `chrome://extensions` and turn on **Developer mode**.
-3. Click **Load unpacked** and pick the `meeting-burn` folder.
+3. Click **Load unpacked** and pick the unzipped folder (the one with
+   `manifest.json` in it).
 
 You then get two ways to run it:
 
@@ -83,7 +86,7 @@ app.css          Every style
 app.js           Every line of behaviour
 manifest.json    Chrome extension manifest (MV3)
 icons/           Extension icons
-scripts/         verify.py — the only check
+scripts/         verify.py (the checks) and package.py (the release ZIP)
 ```
 
 ## How the cost is calculated
@@ -127,6 +130,24 @@ Any current version of Chrome, Edge, Firefox, or Safari; the extension needs Chr
 114+ for its side panel. The design leans on `backdrop-filter` and CSS gradient
 masks; in a browser without them the layout still works, it just looks flatter. `prefers-reduced-motion` is respected — the animated
 background and all transitions are disabled.
+
+## Releases
+
+Each release ships a `meeting-burn-<version>.zip` containing only what the extension
+runs — the four app files, the icons and the licence, with `manifest.json` at the
+archive root. That is both the folder you load unpacked and the package the Chrome
+Web Store accepts.
+
+Build it yourself at any commit:
+
+```bash
+python3 scripts/package.py zip
+```
+
+Releases are cut by hand: the version in `manifest.json` is bumped, the `Unreleased`
+section of the changelog becomes a version section, and a `vX.Y.Z` tag is pushed.
+CI then packages the ZIP and publishes the release with that changelog section as
+its notes; it refuses if the tag and `manifest.json` disagree.
 
 ## Contributing
 

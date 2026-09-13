@@ -8,7 +8,7 @@ Runs in CI and locally with no dependencies:
 Checks that index.html is well-formed, that the app is self-contained (every
 script and stylesheet is a local file — no CDN, no font service, no network
 calls at runtime), that it stays small, and that the Chrome extension manifest
-still points at files that exist.
+still points at files that exist, and that the extension is packageable.
 """
 
 from __future__ import annotations
@@ -18,6 +18,10 @@ import json
 import pathlib
 import re
 import sys
+
+import package
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 APP = ROOT / "index.html"
@@ -143,6 +147,41 @@ def check_manifest(src: str) -> None:
         fail("index.html has an inline <script> — Chrome's MV3 CSP blocks it")
 
 
+def check_packaging() -> None:
+    """Everything `package.py zip` ships must exist, and the ZIP must be uploadable.
+
+    The Chrome Web Store rejects a package for small, boring reasons — a version it
+    can't parse, a description over the limit, a missing 128px icon. Catching those
+    here means a release fails on a PR rather than at upload time.
+    """
+    for name in package.PACKAGE:
+        if not (ROOT / name).exists():
+            fail(f"package.py ships {name}, which does not exist")
+
+    try:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return  # already reported by check_manifest
+
+    version = manifest.get("version", "")
+    if not re.fullmatch(r"\d+(\.\d+){0,3}", str(version)):
+        fail(f"manifest version {version!r} is not one to four dot-separated integers")
+
+    description = manifest.get("description", "")
+    if not description:
+        fail("manifest.json needs a description — the Web Store listing requires one")
+    elif len(description) > 132:
+        fail(f"manifest description is {len(description)} chars, over the Web Store's 132")
+
+    if "128" not in manifest.get("icons", {}):
+        fail("manifest.json needs a 128px icon for the Web Store")
+
+    if "manifest.json" not in package.PACKAGE:
+        fail("the ZIP must contain manifest.json at its root")
+
+    notes.append(f"packages {len(package.PACKAGE)} files as version {version}")
+
+
 def check_accessibility(src: str, styles: str) -> None:
     """Cheap checks for the things that actually break screen readers here."""
     for match in re.finditer(r'<button\b[^>]*>(.*?)</button>', src, re.S | re.I):
@@ -170,6 +209,7 @@ def main() -> int:
         check_self_contained(text)
     check_local_assets(src)
     check_manifest(src)
+    check_packaging()
     check_size(parts)
     check_accessibility(src, parts["app.css"])
 

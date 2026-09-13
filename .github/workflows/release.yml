@@ -1,0 +1,71 @@
+name: Release
+
+# Tagging is manual and deliberate — nothing here bumps a version or creates a tag.
+# Push a `vX.Y.Z` tag on main and this publishes the matching GitHub Release with the
+# extension ZIP attached. Run it by hand (workflow_dispatch) to build the same ZIP as
+# an artifact without releasing anything, which is the way to check packaging first.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release and upload the ZIP
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Verify the app
+        run: python3 scripts/verify.py
+
+      - name: Check the tag matches manifest.json
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          manifest="$(python3 scripts/package.py version)"
+          if [ "$tag" != "$manifest" ]; then
+            echo "::error::tag $GITHUB_REF_NAME says $tag but manifest.json says $manifest."
+            echo "::error::Bump \"version\" in manifest.json, or retag. They must agree."
+            exit 1
+          fi
+
+      - name: Build the extension ZIP
+        run: python3 scripts/package.py zip
+
+      - name: Read the release notes
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          {
+            echo 'NOTES<<CHANGELOG_EOF'
+            python3 scripts/package.py notes "${GITHUB_REF_NAME#v}"
+            echo 'CHANGELOG_EOF'
+          } >> "$GITHUB_ENV"
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes "$NOTES" \
+            dist/meeting-burn-*.zip
+
+      - name: Upload the ZIP as an artifact
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: meeting-burn-extension
+          path: dist/*.zip
+          if-no-files-found: error
