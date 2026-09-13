@@ -130,6 +130,15 @@ Don't amend or rebase commits that are already pushed to a shared branch.
 Open a PR for everything. `main` requires a PR, a passing `Verify` check, and all
 review conversations resolved.
 
+**Open it automatically — don't wait to be asked.** As soon as a change is complete
+and `scripts/verify.py` passes, branch, commit, push and open the PR as the final
+step of the same task. "Complete" means the work is finished and verified, including
+the `README.md` and `CHANGELOG.md` updates the checklist below requires; a
+half-finished change stays uncommitted until it isn't. Report the PR link when you
+are done. Two exceptions: work the maintainer explicitly asked you to leave
+uncommitted, and a change you have flagged as needing a decision before it lands —
+in those cases say so instead of opening one.
+
 ```bash
 git push -u origin feat/pause-resume
 gh pr create --fill   # then edit to match .github/PULL_REQUEST_TEMPLATE.md

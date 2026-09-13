@@ -68,13 +68,15 @@ load it unpacked:
 You then get two ways to run it:
 
 - **Popup** — click the Meeting Burn icon in the toolbar. Quick to open; it closes
-  when you click elsewhere, which is fine because elapsed time comes from wall-clock
-  timestamps, not from the popup being alive.
+  when you click elsewhere, which is fine because the running meeting is saved and
+  restored — elapsed time comes from wall-clock timestamps, not from the popup being
+  alive, so the counter keeps moving while it's shut.
 - **Side panel** — open Chrome's side panel and pick *Meeting Burn*, or click the
   panel button in the popup's header. This is the one to use during a call: it stays
   open beside the meeting tab so the counter is visible the whole time.
 
-Both surfaces load the same `index.html`, and settings are shared between them.
+Both surfaces load the same `index.html`, and settings *and the meeting in progress*
+are shared between them — start in the popup, carry on in the side panel.
 Requires Chrome 114+ (for the side panel). The extension asks for the `sidePanel`
 permission and nothing else — no host permissions, no access to any page you visit.
 
@@ -121,8 +123,8 @@ Open the ⚙︎ settings sheet to change:
 | Currency | ILS | Drives formatting everywhere in the app |
 | Working hours per month | 182 | Use ~173 for a 40-hour week |
 
-Settings are stored under the `mct.settings.v2` key in `localStorage` and never
-leave the browser.
+Settings are stored under the `mct.settings.v2` key in `localStorage`, and the
+meeting in progress under `mct.session.v1`. Neither ever leaves the browser.
 
 ## Browser support
 

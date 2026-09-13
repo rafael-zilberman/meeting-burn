@@ -39,6 +39,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scripts/verify.py` checks all three files, validates `manifest.json` paths, and
   fails if an inline `<script>` reappears in `index.html`.
 
+### Fixed
+
+- A meeting no longer resets when the popup closes. Chrome tears the popup down
+  every time it loses focus; the running meeting is now persisted and restored, so
+  reopening picks up where you left off. A running clock keeps counting while the
+  popup is shut, a paused one stays paused, and the summary screen survives too.
+  Because the popup and the side panel share an origin, a meeting started in one
+  now continues in the other.
+
 Ideas still on the table: meeting history, a weekly total.
 
 ## [1.0.0] — 2026-09-12
