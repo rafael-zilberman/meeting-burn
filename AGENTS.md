@@ -28,7 +28,8 @@ app.js                  Every line of behaviour
 manifest.json           Chrome extension manifest (MV3), at the repo root
 icons/                  Extension icons (generated once, committed)
 scripts/verify.py       The only check. Stock Python, no dependencies.
-.github/workflows/      ci.yml (runs verify.py) and pages.yml (deploys the demo)
+scripts/package.py      Builds the release ZIP; reads a version's changelog section
+.github/workflows/      ci.yml (verify), pages.yml (demo), release.yml (tagged ZIP)
 README.md               User-facing docs
 CONTRIBUTING.md         Human contributor guide
 CHANGELOG.md            Keep a Changelog format
@@ -290,10 +291,48 @@ An agent that cannot open a browser should say which of these it could not check
 
 ---
 
-## 9. Scope boundaries
+## 9. Releases
+
+Releases are **manual and maintainer-initiated**. Nothing in CI bumps a version or
+creates a tag, and an agent must never do either without being asked — see §10.
+
+When you *are* asked to prepare one, the steps are:
+
+1. Bump `"version"` in `manifest.json`. Chrome wants one to four dot-separated
+   integers; this repo uses semver.
+2. In `CHANGELOG.md`, rename `## [Unreleased]` to `## [X.Y.Z] — YYYY-MM-DD` and add
+   a fresh empty `Unreleased` above it. Update the link definitions at the bottom.
+3. Open a PR with just that. Let it merge.
+4. Tag the merge commit on `main` and push the tag:
+
+   ```bash
+   git switch main && git pull --ff-only
+   git tag vX.Y.Z && git push origin vX.Y.Z
+   ```
+
+`release.yml` takes it from there: it runs `verify.py`, refuses if the tag and
+`manifest.json` disagree, builds `dist/meeting-burn-X.Y.Z.zip` with `package.py`,
+and publishes a GitHub Release using that version's changelog section as the notes.
+Running the workflow by hand (`workflow_dispatch`) builds the same ZIP as an
+artifact and releases nothing — that is how to check packaging before tagging.
+
+**The ZIP serves both distribution paths**, which is why `package.py` has an
+explicit file list rather than zipping the directory. It contains only what the
+extension runs, with `manifest.json` at the archive root: unzip it and *Load
+unpacked* works, and the same file uploads to the Chrome Web Store. Adding a file
+the extension needs means adding it to `PACKAGE` in `package.py` — `verify.py`
+imports that list and fails if an entry is missing, but it cannot tell you about a
+file you forgot to list. Don't add documentation or CI config to the package.
+
+Builds are deterministic: fixed entry order, fixed timestamps. The same commit
+always produces a byte-identical archive. Keep it that way.
+
+---
+
+## 10. Scope boundaries
 
 **In scope:** meeting history, cost breakdowns, sharing, currencies, accessibility,
-performance, docs, the extension surfaces.
+performance, docs, the extension surfaces, release packaging.
 
 **Out of scope — don't build these, propose them first:** accounts, a backend,
 analytics or telemetry of any kind, anything that sends data off the device, and

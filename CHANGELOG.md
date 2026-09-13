@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Both load the same `index.html` and share the same settings. Chrome 114+, loaded
   unpacked; `sidePanel` is the only permission.
 - A side-panel button in the popup header, shown only when running as an extension.
+- `scripts/package.py`, which builds `dist/meeting-burn-<version>.zip` — only the
+  files the extension runs, with `manifest.json` at the archive root, so the same
+  ZIP serves both *Load unpacked* and a Chrome Web Store upload. Builds are
+  byte-reproducible.
+- A `Release` workflow: pushing a `vX.Y.Z` tag verifies the app, checks the tag
+  against `manifest.json`, builds the ZIP and publishes a GitHub Release with that
+  version's changelog section as its notes. Running it by hand builds the ZIP as an
+  artifact without releasing. Tagging stays manual.
 
 ### Changed
 
