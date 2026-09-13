@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Ideas on the table: pause/resume, meeting history, a weekly total.
+### Added
+
+- Pause and resume a running meeting. Paused time is excluded from the cost and
+  from the duration shown on the summary, so the total reflects billable time only.
+  The counter dims and the indicator turns amber while paused.
+
+### Changed
+
+- `Space` now pauses and resumes a running meeting instead of ending it. `Enter`
+  ends the meeting. `Space` still starts one from the setup screen.
+
+Ideas still on the table: meeting history, a weekly total.
 
 ## [1.0.0] — 2026-09-12
 
