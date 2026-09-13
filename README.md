@@ -144,10 +144,11 @@ Build it yourself at any commit:
 python3 scripts/package.py zip
 ```
 
-Releases are cut by hand: the version in `manifest.json` is bumped, the `Unreleased`
-section of the changelog becomes a version section, and a `vX.Y.Z` tag is pushed.
-CI then packages the ZIP and publishes the release with that changelog section as
-its notes; it refuses if the tag and `manifest.json` disagree.
+Releases are automatic: every push to `main` tags and publishes one. The version is
+`MAJOR.MINOR` from `manifest.json` with the commit count as the patch, so the
+released version always moves forward. Bump the minor in `manifest.json` when a
+release deserves it — that's the only manual step. Notes come from the `Unreleased`
+section of the changelog, with the commit list appended.
 
 ## Contributing
 
