@@ -335,8 +335,8 @@ always produces a byte-identical archive. Keep it that way.
 performance, docs, the extension surfaces, release packaging.
 
 **Out of scope — don't build these, propose them first:** accounts, a backend,
-analytics or telemetry of any kind, anything that sends data off the device, and any
-change that turns this into more than one file.
+analytics or telemetry of any kind, anything that sends data off the device, and
+anything that needs a build step or grows the file count (see the hard rules in §1).
 
 **Never do without being asked:** merge a PR, push to `main`, create a release or
 tag, change repository settings or branch protection, force-push anything, or alter
