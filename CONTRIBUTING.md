@@ -5,15 +5,20 @@ that opinion shapes everything below.
 
 ## The one rule
 
-**Meeting Burn is a single HTML file with no build step and no runtime
-dependencies.** You should be able to download `index.html`, double-click it, and
-have a working app — forever, with no toolchain, no `npm install`, and no CDN that
-might disappear.
+**Meeting Burn is three hand-written files with no build step and no runtime
+dependencies.** `index.html`, `app.css`, `app.js` — clone the repo, open the HTML,
+and you have a working app, forever, with no toolchain, no `npm install`, and no CDN
+that might disappear. Nothing in the repo is generated.
 
 Contributions that add a framework, a bundler, a package manager, or an external
 script/stylesheet/font will be declined, however good the code is. This isn't
 gatekeeping for its own sake: the constraint is the product. CI enforces it, so a
 PR that breaks it will fail before a human looks at it.
+
+The same files are also a Manifest V3 Chrome extension (`manifest.json` at the repo
+root drives a toolbar popup and a side panel). There is no separate extension build
+and no second copy of the app — which is why the CSS and JS live in their own files:
+Chrome's extension CSP blocks inline `<script>`.
 
 Everything else is open for discussion.
 
@@ -31,6 +36,10 @@ You can also just open `index.html` directly from the filesystem — everything 
 except that `localStorage` behaves differently on `file://` in some browsers, so
 prefer the server when testing settings persistence.
 
+To work on the extension, open `chrome://extensions`, turn on **Developer mode**,
+click **Load unpacked** and pick the repo folder. After an edit, hit the reload arrow
+on the extension card and reopen the popup or side panel.
+
 ## Before you open a pull request
 
 Run the checks locally. They're the same ones CI runs:
@@ -46,6 +55,9 @@ Then test by hand in at least one browser:
 - Change currency and salary in settings, reload the page, confirm they persisted.
 - Try the keyboard: `Space` to start/stop, `↑ ↓` for headcount, `Esc` to close settings.
 - Check it at a narrow width (~375px) and a wide one.
+- If you changed markup, styles or behaviour, load the folder unpacked in Chrome and
+  check both the popup and the side panel — a page that works over `http://` can
+  still be blocked by the extension's content security policy.
 - If you touched anything animated, verify it with reduced motion enabled
   (macOS: System Settings → Accessibility → Display → Reduce motion).
 
@@ -54,11 +66,12 @@ Then test by hand in at least one browser:
 There's no linter, so match what's already there:
 
 - 2-space indentation, LF line endings, UTF-8 (`.editorconfig` handles this).
-- CSS is organized in commented sections; keep colors and spacing as custom
-  properties in `:root` rather than hardcoding values.
-- JavaScript is plain ES2020+ in a single IIFE, `"use strict"`. No transpiling, so
-  stick to syntax current browsers support natively.
-- Prefer clarity over cleverness. Someone should be able to read this file top to
+- CSS lives in `app.css`, organized in commented sections; keep colors and spacing as
+  custom properties in `:root` rather than hardcoding values.
+- JavaScript lives in `app.js`: plain ES2020+ in a single IIFE, `"use strict"`. No
+  transpiling, so stick to syntax current browsers support natively. Never move it
+  back into an inline `<script>` — that breaks the extension.
+- Prefer clarity over cleverness. Someone should be able to read these files top to
   bottom in one sitting.
 
 ## Commit messages
