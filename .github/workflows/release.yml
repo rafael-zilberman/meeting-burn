@@ -1,71 +1,99 @@
 name: Release
 
-# Tagging is manual and deliberate — nothing here bumps a version or creates a tag.
-# Push a `vX.Y.Z` tag on main and this publishes the matching GitHub Release with the
-# extension ZIP attached. Run it by hand (workflow_dispatch) to build the same ZIP as
-# an artifact without releasing anything, which is the way to check packaging first.
+# Every push to main publishes a release. The version is derived, not hand-edited:
+# MAJOR.MINOR comes from manifest.json, the patch is the commit count on main. That
+# only ever goes up, which is what the Chrome Web Store requires of consecutive
+# uploads. Bump MAJOR or MINOR in manifest.json when a release deserves it.
+#
+# Run it by hand (workflow_dispatch) to build the same ZIP as an artifact without
+# tagging or publishing anything.
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
+
+# One release at a time. Two pushes in quick succession must not race for the same
+# tag, and a queued run must not be cancelled half-way through publishing.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
     name: Package
     runs-on: ubuntu-latest
     permissions:
-      contents: write # create the release and upload the ZIP
+      contents: write # create the tag, the release and upload the ZIP
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the patch digit is the commit count
 
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
+      - name: Work out the version
+        id: version
+        run: |
+          version="$(python3 scripts/package.py release-version)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "Releasing $version" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stamp it into manifest.json
+        # Not committed back — main stays the source of MAJOR.MINOR only, and a
+        # commit from CI would trigger this workflow again.
+        run: python3 scripts/package.py stamp "${{ steps.version.outputs.version }}"
+
       - name: Verify the app
         run: python3 scripts/verify.py
-
-      - name: Check the tag matches manifest.json
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          tag="${GITHUB_REF_NAME#v}"
-          manifest="$(python3 scripts/package.py version)"
-          if [ "$tag" != "$manifest" ]; then
-            echo "::error::tag $GITHUB_REF_NAME says $tag but manifest.json says $manifest."
-            echo "::error::Bump \"version\" in manifest.json, or retag. They must agree."
-            exit 1
-          fi
 
       - name: Build the extension ZIP
         run: python3 scripts/package.py zip
 
-      - name: Read the release notes
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          {
-            echo 'NOTES<<CHANGELOG_EOF'
-            python3 scripts/package.py notes "${GITHUB_REF_NAME#v}"
-            echo 'CHANGELOG_EOF'
-          } >> "$GITHUB_ENV"
-
-      - name: Publish the release
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "$GITHUB_REF_NAME" \
-            --title "$GITHUB_REF_NAME" \
-            --notes "$NOTES" \
-            dist/meeting-burn-*.zip
-
       - name: Upload the ZIP as an artifact
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v7
         with:
           name: meeting-burn-extension
           path: dist/*.zip
           if-no-files-found: error
+
+      - name: Check the tag is free
+        if: github.event_name == 'push'
+        id: tag
+        run: |
+          if git ls-remote --exit-code --tags origin "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "::notice::${{ steps.version.outputs.tag }} already exists — nothing to publish."
+            echo "free=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "free=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Read the release notes
+        if: github.event_name == 'push' && steps.tag.outputs.free == 'true'
+        run: |
+          {
+            echo 'NOTES<<CHANGELOG_EOF'
+            python3 scripts/package.py notes
+            echo 'CHANGELOG_EOF'
+          } >> "$GITHUB_ENV"
+
+      - name: Tag and publish
+        if: github.event_name == 'push' && steps.tag.outputs.free == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "$TAG"
+          git push origin "$TAG"
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes "$NOTES" \
+            --generate-notes \
+            dist/meeting-burn-*.zip

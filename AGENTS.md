@@ -293,28 +293,34 @@ An agent that cannot open a browser should say which of these it could not check
 
 ## 9. Releases
 
-Releases are **manual and maintainer-initiated**. Nothing in CI bumps a version or
-creates a tag, and an agent must never do either without being asked — see §10.
+**Every push to `main` publishes a release.** Merging a PR is therefore a publishing
+action — one more reason an agent must never merge its own PR unasked (§10).
 
-When you *are* asked to prepare one, the steps are:
+The version is derived, not hand-edited. `release.yml` takes MAJOR.MINOR from
+`manifest.json` and uses the commit count on `main` as the patch, so `1.1.0` in the
+repo ships as `1.1.42`. The count only ever increases, which is what the Chrome Web
+Store requires of consecutive uploads, and it needs no state carried between runs.
 
-1. Bump `"version"` in `manifest.json`. Chrome wants one to four dot-separated
-   integers; this repo uses semver.
-2. In `CHANGELOG.md`, rename `## [Unreleased]` to `## [X.Y.Z] — YYYY-MM-DD` and add
-   a fresh empty `Unreleased` above it. Update the link definitions at the bottom.
-3. Open a PR with just that. Let it merge.
-4. Tag the merge commit on `main` and push the tag:
+**The patch digit committed in `manifest.json` is a placeholder.** CI overwrites it
+with `package.py stamp` before packaging and does not commit the result — a commit
+from CI would re-trigger the workflow. Don't try to keep that digit accurate by hand,
+and don't read it as the released version; `git tag` is the record of what shipped.
 
-   ```bash
-   git switch main && git pull --ff-only
-   git tag vX.Y.Z && git push origin vX.Y.Z
-   ```
+To make a release **1.2.0 instead of 1.1.x**, bump MINOR in `manifest.json` in an
+ordinary PR. The next push to `main` picks it up. That is the only manual step, and
+it is the only reason to touch the version at all.
 
-`release.yml` takes it from there: it runs `verify.py`, refuses if the tag and
-`manifest.json` disagree, builds `dist/meeting-burn-X.Y.Z.zip` with `package.py`,
-and publishes a GitHub Release using that version's changelog section as the notes.
+Release notes come from `CHANGELOG.md`: the section matching the version if one
+exists, otherwise `## [Unreleased]`, with GitHub's generated commit list appended.
+In practice `Unreleased` is the notes for every release, so **keep it current** —
+it is now user-facing on each merge, not a staging area for some future version.
+Its entries are the human-written summary the commit list can't give.
+
 Running the workflow by hand (`workflow_dispatch`) builds the same ZIP as an
-artifact and releases nothing — that is how to check packaging before tagging.
+artifact and tags nothing. That is how to check packaging without publishing.
+
+A re-run for a commit that already has its tag exits without republishing, so
+re-running a failed job is safe.
 
 **The ZIP serves both distribution paths**, which is why `package.py` has an
 explicit file list rather than zipping the directory. It contains only what the
@@ -339,5 +345,6 @@ analytics or telemetry of any kind, anything that sends data off the device, and
 anything that needs a build step or grows the file count (see the hard rules in §1).
 
 **Never do without being asked:** merge a PR, push to `main`, create a release or
-tag, change repository settings or branch protection, force-push anything, or alter
-`LICENSE`.
+tag by hand, change repository settings or branch protection, force-push anything,
+or alter `LICENSE`. The first two now publish a release as a side effect (§9), so
+they are not reversible in the way they used to be.

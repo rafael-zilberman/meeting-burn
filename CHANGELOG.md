@@ -21,10 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   files the extension runs, with `manifest.json` at the archive root, so the same
   ZIP serves both *Load unpacked* and a Chrome Web Store upload. Builds are
   byte-reproducible.
-- A `Release` workflow: pushing a `vX.Y.Z` tag verifies the app, checks the tag
-  against `manifest.json`, builds the ZIP and publishes a GitHub Release with that
-  version's changelog section as its notes. Running it by hand builds the ZIP as an
-  artifact without releasing. Tagging stays manual.
+- A `Release` workflow: every push to `main` verifies the app, builds the ZIP, tags
+  and publishes a GitHub Release. The version is `MAJOR.MINOR` from `manifest.json`
+  with the commit count as the patch, so it always moves forward; bump the minor by
+  hand when a release deserves it. Notes come from this `Unreleased` section with
+  the commit list appended. Running the workflow by hand builds the ZIP as an
+  artifact and publishes nothing.
 
 ### Changed
 

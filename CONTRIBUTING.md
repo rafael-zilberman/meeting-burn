@@ -76,17 +76,25 @@ There's no linter, so match what's already there:
 
 ## Releases
 
-You don't need to do anything for a release — the maintainer bumps the version and
-pushes a `vX.Y.Z` tag, and CI publishes the extension ZIP. If you want the exact
-package CI would build, at any commit:
+Releases are automatic: every merge to `main` publishes one, versioned
+`MAJOR.MINOR.<commit count>`. You don't need to tag anything.
+
+Two things this asks of a PR:
+
+- **Add a `CHANGELOG.md` entry under `## [Unreleased]`** for anything user-visible.
+  That section becomes the release notes the moment your PR merges, so it is read by
+  users rather than banked for later.
+- **If your change adds a file the extension needs at runtime**, add it to `PACKAGE`
+  in `scripts/package.py`, or it won't be in the ZIP.
+
+If you want the exact package CI would build, at any commit:
 
 ```bash
 python3 scripts/package.py zip
 ```
 
 It lands in `dist/`, unzips into a folder you can *Load unpacked*, and is the same
-file the Chrome Web Store would receive. If your change adds a file the extension
-needs at runtime, add it to `PACKAGE` in `scripts/package.py` too.
+file the Chrome Web Store would receive.
 
 ## Commit messages
 

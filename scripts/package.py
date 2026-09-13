@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
-"""Build the distributable Chrome extension ZIP, and read release notes.
+"""Build the distributable Chrome extension ZIP, and the version it ships under.
 
 Stock Python, no dependencies, same as everything else here:
 
     python3 scripts/package.py zip              # -> dist/meeting-burn-<version>.zip
-    python3 scripts/package.py notes 1.1.0      # the CHANGELOG section for a version
     python3 scripts/package.py version          # the version in manifest.json
+    python3 scripts/package.py release-version  # the version CI will publish
+    python3 scripts/package.py stamp 1.1.42     # write that version into manifest.json
+    python3 scripts/package.py notes            # the release notes body
+
+Every push to `main` publishes a release, so the patch digit is derived rather than
+hand-edited: `release-version` takes MAJOR.MINOR from manifest.json and uses the
+commit count on the current branch as the patch. That count only ever goes up, which
+is what the Chrome Web Store requires of consecutive uploads, and it needs no state
+carried between runs. **The patch digit committed in manifest.json is a placeholder**
+— CI overwrites it with `stamp` before packaging. Bump MAJOR or MINOR by hand when a
+release deserves it.
 
 The ZIP is what both distribution paths want:
 
@@ -25,6 +35,7 @@ import argparse
 import json
 import pathlib
 import re
+import subprocess
 import sys
 import zipfile
 
@@ -52,17 +63,52 @@ def version() -> str:
     return json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))["version"]
 
 
-def notes(for_version: str) -> str:
-    """The body of one `## [x.y.z]` section of CHANGELOG.md, without its heading."""
+def section(heading: str) -> str | None:
+    """The body of one `## [heading]` section of CHANGELOG.md, without its heading."""
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    pattern = rf"^## \[{re.escape(for_version)}\][^\n]*\n(.*?)(?=^## |\Z)"
+    pattern = rf"^## \[{re.escape(heading)}\][^\n]*\n(.*?)(?=^## |\Z)"
     match = re.search(pattern, changelog, re.S | re.M)
-    if not match:
-        raise SystemExit(
-            f"error: CHANGELOG.md has no '## [{for_version}]' section.\n"
-            f"       Move the Unreleased entries under a [{for_version}] heading first."
-        )
-    return match.group(1).strip()
+    return match.group(1).strip() if match else None
+
+
+def notes(for_version: str) -> str:
+    """Release notes: that version's changelog section, else Unreleased.
+
+    Auto-published versions have no section of their own, so Unreleased is the
+    normal path — it is where the human-written summary of what has landed lives.
+    CI appends GitHub's generated commit list after this.
+    """
+    return section(for_version) or section("Unreleased") or ""
+
+
+def commit_count() -> int:
+    result = subprocess.run(
+        ["git", "rev-list", "--count", "HEAD"],
+        cwd=ROOT, capture_output=True, text=True, check=False,
+    )
+    if result.returncode != 0:
+        raise SystemExit(f"error: cannot count commits: {result.stderr.strip()}")
+    return int(result.stdout.strip())
+
+
+def release_version() -> str:
+    """MAJOR.MINOR from manifest.json, patch from the commit count."""
+    parts = version().split(".")
+    if len(parts) < 2:
+        raise SystemExit(f"error: manifest version {version()!r} has no minor digit")
+    return f"{parts[0]}.{parts[1]}.{commit_count()}"
+
+
+def stamp(new_version: str) -> None:
+    """Write a version into manifest.json, preserving formatting."""
+    path = ROOT / "manifest.json"
+    text = path.read_text(encoding="utf-8")
+    stamped, count = re.subn(
+        r'("version"\s*:\s*)"[^"]*"', rf'\1"{new_version}"', text, count=1
+    )
+    if count != 1:
+        raise SystemExit("error: could not find \"version\" in manifest.json")
+    path.write_text(stamped, encoding="utf-8")
 
 
 def build(dest: pathlib.Path) -> pathlib.Path:
@@ -87,15 +133,28 @@ def main() -> int:
     zip_cmd = sub.add_parser("zip", help="build the extension ZIP")
     zip_cmd.add_argument("--out", type=pathlib.Path, default=None)
 
-    notes_cmd = sub.add_parser("notes", help="print a version's CHANGELOG section")
+    notes_cmd = sub.add_parser("notes", help="print the release notes body")
     notes_cmd.add_argument("version", nargs="?", default=None)
 
     sub.add_parser("version", help="print the version in manifest.json")
+    sub.add_parser("release-version", help="print the version CI will publish")
+
+    stamp_cmd = sub.add_parser("stamp", help="write a version into manifest.json")
+    stamp_cmd.add_argument("version")
 
     args = parser.parse_args()
 
     if args.command == "version":
         print(version())
+        return 0
+
+    if args.command == "release-version":
+        print(release_version())
+        return 0
+
+    if args.command == "stamp":
+        stamp(args.version)
+        print(f"  · manifest.json version is now {args.version}")
         return 0
 
     if args.command == "notes":
