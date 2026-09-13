@@ -31,12 +31,16 @@ it's still happening, which is the only moment the information is useful.
 - **Settings persist** in `localStorage`. Set it once.
 - **Keyboard-driven** — `Space` starts and stops, `↑ ↓` adjust headcount, `Esc`
   closes settings.
-- **Zero dependencies.** One HTML file. No build step, no npm install, no tracking,
+- **Chrome extension** — the same app as a toolbar popup and a side panel, so the
+  counter stays visible next to your call.
+- **Zero dependencies.** Three files, no build step, no npm install, no tracking,
   no network calls of any kind.
 
 ## Usage
 
-Download [`index.html`](index.html) and open it in a browser. That's the whole install.
+Use the [live demo](https://rafael-zilberman.github.io/meeting-burn/), or clone the
+repo and open `index.html` in a browser — there is nothing to install and nothing to
+compile.
 
 To run it from a local server instead:
 
@@ -45,6 +49,39 @@ git clone git@github.com:rafael-zilberman/meeting-burn.git && cd meeting-burn &&
 ```
 
 Then open <http://localhost:4187>.
+
+## Install as a Chrome extension
+
+The repository is also a Manifest V3 extension. It isn't on the Web Store; load it
+unpacked:
+
+1. Clone the repo (the whole folder is the extension — `manifest.json` is at its root).
+2. Open `chrome://extensions` and turn on **Developer mode**.
+3. Click **Load unpacked** and pick the `meeting-burn` folder.
+
+You then get two ways to run it:
+
+- **Popup** — click the Meeting Burn icon in the toolbar. Quick to open; it closes
+  when you click elsewhere, which is fine because elapsed time comes from wall-clock
+  timestamps, not from the popup being alive.
+- **Side panel** — open Chrome's side panel and pick *Meeting Burn*, or click the
+  panel button in the popup's header. This is the one to use during a call: it stays
+  open beside the meeting tab so the counter is visible the whole time.
+
+Both surfaces load the same `index.html`, and settings are shared between them.
+Requires Chrome 114+ (for the side panel). The extension asks for the `sidePanel`
+permission and nothing else — no host permissions, no access to any page you visit.
+
+## Project structure
+
+```
+index.html       Markup
+app.css          Every style
+app.js           Every line of behaviour
+manifest.json    Chrome extension manifest (MV3)
+icons/           Extension icons
+scripts/         verify.py — the only check
+```
 
 ## How the cost is calculated
 
@@ -79,15 +116,16 @@ leave the browser.
 
 ## Browser support
 
-Any current version of Chrome, Edge, Firefox, or Safari. The design leans on
+Any current version of Chrome, Edge, Firefox, or Safari (the extension needs Chrome
+114+). The design leans on
 `backdrop-filter` and CSS gradient masks; in a browser without them the layout still
 works, it just looks flatter. `prefers-reduced-motion` is respected — the animated
 background and all transitions are disabled.
 
 ## Contributing
 
-Issues and pull requests are welcome. The entire app is one file, so changes are
-easy to read and easy to review. Please keep it that way: **no build step and no
+Issues and pull requests are welcome. The whole app is three short files, so changes
+are easy to read and easy to review. Please keep it that way: **no build step and no
 runtime dependencies** — CI enforces it.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) first, then:
