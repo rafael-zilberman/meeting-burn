@@ -30,9 +30,12 @@
   // in storage and rebuilt on the next open. Times are absolute epoch ms, which
   // means a session survives being closed for an hour just as well as a blink.
   const SKEY = "mct.session.v1";
+  // The history entry the summary screen is currently naming, so reopening the
+  // popup on a finished meeting keeps editing that entry instead of adding one.
+  let historyId = null;
   const loadSession = () => { try { return JSON.parse(localStorage.getItem(SKEY) || "null"); } catch { return null; } };
   const saveSession = phase => {
-    try { localStorage.setItem(SKEY, JSON.stringify({ phase, accumulated, segmentAt, paused, people })); } catch {}
+    try { localStorage.setItem(SKEY, JSON.stringify({ phase, accumulated, segmentAt, paused, people, historyId })); } catch {}
   };
   const clearSession = () => { try { localStorage.removeItem(SKEY); } catch {} };
 
@@ -44,6 +47,14 @@
   const nf2 = () => new Intl.NumberFormat(undefined, { style:"currency", currency:S.currency, minimumFractionDigits:2, maximumFractionDigits:2 });
   let FW = nfWhole(), F2 = nf2();
   const refreshFmt = () => { try { FW = nfWhole(); F2 = nf2(); } catch { S.currency = "USD"; FW = nfWhole(); F2 = nf2(); } };
+
+  // History entries are shown in the currency they were recorded in, not the
+  // current setting — an old meeting's cost is a fact, not a live conversion.
+  const money2 = (v, cur) => {
+    try { return new Intl.NumberFormat(undefined, { style:"currency", currency:cur, minimumFractionDigits:2, maximumFractionDigits:2 }).format(v); }
+    catch { return new Intl.NumberFormat(undefined, { style:"currency", currency:"USD", minimumFractionDigits:2, maximumFractionDigits:2 }).format(v); }
+  };
+  const stamp = new Intl.DateTimeFormat(undefined, { month:"short", day:"numeric", hour:"numeric", minute:"2-digit" });
 
   const clock = s => {
     s = Math.floor(s);
@@ -134,6 +145,7 @@
 
   function begin(){
     accumulated = 0; segmentAt = Date.now(); paused = false; lastWhole = -1;
+    historyId = null;   // this meeting gets its entry when it ends
     enterRun();
     saveSession("run");
   }
@@ -167,6 +179,7 @@
     if (!paused) accumulated += Date.now() - segmentAt;
     paused = true;
     cancelAnimationFrame(raf);
+    historyId = record();
     showDone();
     saveSession("done");
   }
@@ -181,6 +194,8 @@
     $("dPeople").textContent = people;
     $("dEach").textContent = F2.format(total / people);
     $("quip").innerHTML = quipFor(total, secs);
+    const entry = entryFor(historyId);
+    elName.value = entry ? entry.name : "";
     show("viewDone");
   }
 
@@ -208,10 +223,139 @@
 
   $("copy").addEventListener("click", async e => {
     const secs = accumulated / 1000;
-    const text = `Meeting cost: ${F2.format(secs * perSecond())}\n${people} people · ${clock(secs)} · ${FW.format(perMinute())}/min`;
+    const entry = entryFor(historyId);
+    const title = entry && entry.name ? entry.name + "\n" : "";
+    const text = `${title}Meeting cost: ${F2.format(secs * perSecond())}\n${people} people · ${clock(secs)} · ${FW.format(perMinute())}/min`;
     try { await navigator.clipboard.writeText(text); e.target.textContent = "Copied ✓"; }
     catch { e.target.textContent = "Copy failed"; }
     setTimeout(() => { e.target.textContent = "Copy summary"; }, 1600);
+  });
+
+  /* ───────── meeting history ───────── */
+  // Finished meetings, newest first. Each entry freezes the cost, the currency
+  // and the headcount as they were when the meeting ended, so changing the salary
+  // later rewrites the rate preview but never the past.
+  const HKEY = "mct.history.v1";
+  const HIST_MAX = 50;
+  let hist = [];
+  try { const raw = JSON.parse(localStorage.getItem(HKEY) || "[]"); if (Array.isArray(raw)) hist = raw; } catch {}
+  const saveHist = () => { try { localStorage.setItem(HKEY, JSON.stringify(hist)); } catch {} };
+  const entryFor = id => (id ? hist.find(e => e.id === id) : undefined);
+
+  function record(){
+    const entry = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      name: "",
+      endedAt: Date.now(),
+      ms: accumulated,
+      people,
+      cost: (accumulated / 1000) * perSecond(),
+      currency: S.currency,
+    };
+    hist.unshift(entry);
+    if (hist.length > HIST_MAX) hist.length = HIST_MAX;
+    saveHist();
+    return entry.id;
+  }
+
+  const elName = $("meetingName"), elHistList = $("histList"), elHistTotal = $("histTotal");
+  const clearBtn = $("clearHistory");
+
+  elName.addEventListener("input", () => {
+    const entry = entryFor(historyId);
+    if (!entry) return;
+    entry.name = elName.value.trim();
+    saveHist();
+  });
+
+  const DEL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/>' +
+    '<path d="M6 7l1 12.4a1.6 1.6 0 0 0 1.6 1.5h6.8a1.6 1.6 0 0 0 1.6-1.5L18 7"/>' +
+    '<path d="M9 7V4.6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1V7"/></svg>';
+
+  function histRow(e){
+    const li = document.createElement("li");
+    li.className = "hist-item";
+
+    const main = document.createElement("div");
+    main.className = "hist-main";
+    const name = document.createElement("div");
+    name.className = e.name ? "hist-name" : "hist-name untitled";
+    name.textContent = e.name || "Untitled meeting";        // textContent: a name is user input
+    const meta = document.createElement("div");
+    meta.className = "hist-meta";
+    meta.textContent = `${stamp.format(new Date(e.endedAt))} · ${clock(e.ms / 1000)} · ` +
+      `${e.people} ${e.people === 1 ? "person" : "people"}`;
+    main.append(name, meta);
+
+    const cost = document.createElement("div");
+    cost.className = "hist-cost";
+    cost.textContent = money2(e.cost, e.currency);
+
+    const del = document.createElement("button");
+    del.className = "hist-del";
+    del.type = "button";
+    del.setAttribute("aria-label", `Delete ${e.name || "untitled meeting"}`);
+    del.innerHTML = DEL_ICON;
+    del.addEventListener("click", () => {
+      hist = hist.filter(x => x.id !== e.id);
+      saveHist();
+      renderHistory();
+    });
+
+    li.append(main, cost, del);
+    return li;
+  }
+
+  function renderHistory(){
+    elHistList.innerHTML = "";
+    clearBtn.textContent = "Clear all";
+    clearBtn.hidden = !hist.length;
+
+    if (!hist.length) {
+      const li = document.createElement("li");
+      li.className = "hist-empty";
+      li.textContent = "No meetings yet. End one and it lands here.";
+      elHistList.appendChild(li);
+      elHistTotal.textContent = "";
+      return;
+    }
+
+    // Currencies are never added together; each one gets its own total.
+    const totals = new Map();
+    for (const e of hist) totals.set(e.currency, (totals.get(e.currency) || 0) + e.cost);
+    elHistTotal.textContent = `${hist.length} meeting${hist.length === 1 ? "" : "s"} · ` +
+      [...totals].map(([cur, sum]) => money2(sum, cur)).join(" + ");
+
+    for (const e of hist) elHistList.appendChild(histRow(e));
+  }
+
+  let backView = "viewSetup";
+  function openHistory(){
+    const current = document.querySelector(".view.active");
+    if (current && current.id !== "viewHistory") backView = current.id;
+    renderHistory();
+    show("viewHistory");
+  }
+  const closeHistory = () => show(backView);
+
+  $("openHistory").addEventListener("click", openHistory);
+  $("histBack").addEventListener("click", closeHistory);
+
+  // Clearing is destructive and there is no undo, so it takes two taps rather
+  // than a confirm() — extension popups are a poor place for a modal dialog.
+  let clearTimer = 0;
+  clearBtn.addEventListener("click", () => {
+    if (clearTimer) {
+      clearTimeout(clearTimer);
+      clearTimer = 0;
+      hist = [];
+      saveHist();
+      renderHistory();
+      return;
+    }
+    clearBtn.textContent = "Tap again to clear";
+    clearTimer = setTimeout(() => { clearTimer = 0; clearBtn.textContent = "Clear all"; }, 4000);
   });
 
   /* ───────── settings sheet ───────── */
@@ -261,7 +405,11 @@
 
   /* ───────── keyboard ───────── */
   document.addEventListener("keydown", e => {
-    if (e.key === "Escape") return closeSheet();
+    if (e.key === "Escape") {
+      if (sheet.classList.contains("open")) return closeSheet();
+      if ($("viewHistory").classList.contains("active")) return closeHistory();
+      return;
+    }
     if (sheet.classList.contains("open")) return;
     if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
     if (e.code === "Space") {
@@ -302,7 +450,12 @@
     paused      = !!restored.paused;
     people      = Math.max(1, Math.min(200, Number(restored.people) || people));
     lastWhole   = -1;
+    historyId   = restored.historyId || null;
     if (restored.phase === "run") enterRun();
-    else showDone();
+    else {
+      // A summary saved before history existed has no entry; give it one now.
+      if (!historyId) { historyId = record(); saveSession("done"); }
+      showDone();
+    }
   }
 })();

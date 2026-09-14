@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Meeting history.** Ending a meeting files it away, and the summary screen now has
+  a *Name this meeting* field that renames the entry as you type. A ⏱ button in the
+  header opens the list — newest first, with the cost, duration, headcount and end
+  time of each meeting, a per-row delete and a two-tap *Clear all*. The last 50 are
+  kept, under the `mct.history.v1` key in `localStorage`.
+- Each entry freezes the cost and the currency it was recorded in, so changing the
+  salary or the currency later never rewrites a past meeting. The list totals each
+  currency on its own rather than adding them together.
+- The copied summary now leads with the meeting's name, when it has one.
 - Pause and resume a running meeting. Paused time is excluded from the cost and
   from the duration shown on the summary, so the total reflects billable time only.
   The counter dims and the indicator turns amber while paused.
@@ -30,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `Esc` now backs out of the history list as well as closing the settings sheet.
+- The card scrolls instead of clipping when a viewport is too short to hold a view —
+  the summary grew by a field, and a small window or the fixed-height popup could
+  otherwise cut off its last button.
 - `Space` now pauses and resumes a running meeting instead of ending it. `Enter`
   ends the meeting. `Space` still starts one from the setup screen.
 - The app is now three files — `index.html`, `app.css`, `app.js` — instead of one.
