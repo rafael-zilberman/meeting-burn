@@ -53,9 +53,13 @@ body{
   background:linear-gradient(160deg, rgba(255,255,255,.075), rgba(255,255,255,.028));
   backdrop-filter:blur(28px) saturate(160%); -webkit-backdrop-filter:blur(28px) saturate(160%);
   border-radius:var(--r-lg); box-shadow:var(--shadow);
-  padding:34px 32px 30px; overflow:hidden;
+  padding:34px 32px 30px; overflow:hidden auto;
+  /* The summary is the tallest view; on a short viewport the card scrolls
+     rather than clipping its last button. */
+  max-height:100%;
   transition:height .5s var(--ease);
 }
+.card::-webkit-scrollbar{ width:0 }
 .card::before{ /* gradient hairline */
   content:""; position:absolute; inset:0; border-radius:inherit; padding:1px;
   background:linear-gradient(150deg, rgba(255,255,255,.42), rgba(255,255,255,.05) 42%, rgba(255,255,255,.16));
@@ -190,8 +194,41 @@ header{ display:flex; align-items:center; gap:10px; margin-bottom:30px; position
   background:linear-gradient(175deg,#fff,#fde68a 60%,#f59e0b);
   -webkit-background-clip:text; background-clip:text; color:transparent; text-shadow:0 0 70px rgba(251,191,36,.3); }
 .quip{ font-size:14px; color:var(--ink-dim); line-height:1.55; margin:18px auto 24px; max-width:33ch; }
+.done-stats{ margin-bottom:22px; }
 .quip em{ color:var(--amber); font-style:normal; font-weight:600; }
 .actions{ display:flex; flex-direction:column; gap:10px; }
+
+/* ───────────────────────── history ───────────────────────── */
+.hist-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; }
+.link-btn{ border:0; background:none; padding:4px 0; cursor:pointer; color:var(--ink-faint);
+  font-family:inherit; font-size:12px; font-weight:600; letter-spacing:.04em; transition:color .2s; }
+.link-btn:hover{ color:var(--rose); }
+.link-btn[hidden]{ display:none; }
+.hist-total{ font-size:12.5px; color:var(--ink-dim); margin:0 0 14px; font-variant-numeric:tabular-nums; }
+.hist-list{ list-style:none; margin:0 0 18px; padding:0;
+  display:flex; flex-direction:column; gap:1px; background:var(--stroke);
+  border:1px solid var(--stroke); border-radius:var(--r-md);
+  overflow:hidden auto; max-height:min(320px, 42vh); overscroll-behavior:contain; }
+.hist-list::-webkit-scrollbar{ width:0 }
+.hist-item{ display:flex; align-items:center; gap:10px; padding:12px 12px 12px 14px; background:rgba(12,12,20,.5); }
+.hist-main{ flex:1; min-width:0; }
+.hist-name{ font-size:14px; font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hist-name.untitled{ color:var(--ink-faint); font-weight:500; font-style:italic; }
+.hist-meta{ font-size:11.5px; color:var(--ink-faint); margin-top:3px; font-variant-numeric:tabular-nums; }
+.hist-cost{ flex:none; font-family:var(--num); font-size:15px; font-variant-numeric:tabular-nums; color:var(--amber); }
+.hist-del{ flex:none; width:30px; height:30px; border-radius:9px; display:grid; place-items:center; cursor:pointer;
+  border:1px solid transparent; background:none; color:var(--ink-faint);
+  transition:color .2s, background .2s, border-color .2s; }
+.hist-del:hover{ color:var(--rose); background:rgba(251,113,133,.12); border-color:rgba(251,113,133,.32); }
+.hist-del svg{ width:15px; height:15px; }
+.hist-empty{ padding:28px 18px; text-align:center; font-size:13px; line-height:1.5;
+  color:var(--ink-faint); background:rgba(12,12,20,.5); }
+
+/* naming the meeting that just ended, on the summary */
+.name-field{ margin-bottom:20px; }
+.name-field .input-wrap{ height:50px; }
+.name-field input{ font-family:var(--font); font-size:15px; font-weight:500; }
+.name-field input::placeholder{ color:var(--ink-faint); font-weight:400; }
 
 /* ───────────────────────── settings sheet ───────────────────────── */
 .scrim{ position:fixed; inset:0; z-index:3; background:rgba(4,4,8,.6); backdrop-filter:blur(6px);
@@ -240,11 +277,19 @@ html.ext-popup{ width:384px; height:592px; }
 html.ext body{ padding:16px; align-content:start; }
 html.ext .card{ width:100%; padding:26px 22px 24px; border-radius:24px; }
 html.ext .sheet{ padding-inline:22px; }
+/* The popup cannot grow, so the summary — the tallest view — is tightened here
+   rather than everywhere. */
+html.ext .final .cap{ margin-bottom:10px; }
+html.ext .quip{ margin:12px auto 16px; }
+html.ext .done-stats{ margin-bottom:14px; }
+html.ext .name-field{ margin-bottom:16px; }
+html.ext .name-field .input-wrap{ height:46px; }
 
 @media (max-width:420px){
   .card{ padding:28px 22px 26px; border-radius:24px; }
   .sheet{ padding-inline:22px; }
   .stat .v{ font-size:15px; }
+  .hist-cost{ font-size:14px; }
 }
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }

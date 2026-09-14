@@ -31,6 +31,11 @@
         <rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M15 4v16"/>
       </svg>
     </button>
+    <button class="icon-btn plain" id="openHistory" aria-label="Meeting history">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3.1 12a8.9 8.9 0 1 0 2.7-6.4"/><path d="M3 4.4V9h4.6"/><path d="M12 7.6V12l3 1.9"/>
+      </svg>
+    </button>
     <button class="icon-btn" id="openSettings" aria-label="Settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"/>
@@ -87,10 +92,16 @@
         <div class="total" id="total">$0.00</div>
         <p class="quip" id="quip"></p>
       </div>
-      <div class="stats" style="margin-bottom:22px">
+      <div class="stats done-stats">
         <div class="stat"><div class="k">Duration</div><div class="v" id="dDur">0:00</div></div>
         <div class="stat"><div class="k">People</div><div class="v" id="dPeople">5</div></div>
         <div class="stat"><div class="k">Per person</div><div class="v" id="dEach">$0</div></div>
+      </div>
+      <div class="field name-field">
+        <label class="label" for="meetingName">Name this meeting</label>
+        <div class="input-wrap">
+          <input id="meetingName" type="text" maxlength="60" autocomplete="off" placeholder="Weekly sync" />
+        </div>
       </div>
       <div class="actions">
         <button class="btn" id="again">
@@ -101,6 +112,17 @@
         </button>
         <button class="btn ghost" id="copy">Copy summary</button>
       </div>
+    </section>
+
+    <!-- ── HISTORY ── -->
+    <section class="view" id="viewHistory">
+      <div class="hist-head">
+        <div class="label">Meeting history</div>
+        <button class="link-btn" id="clearHistory" type="button">Clear all</button>
+      </div>
+      <p class="hist-total" id="histTotal"></p>
+      <ul class="hist-list" id="histList"></ul>
+      <button class="btn ghost" id="histBack">Back</button>
     </section>
   </div>
 </main>

@@ -31,9 +31,13 @@ it's still happening, which is the only moment the information is useful.
   formatted with `Intl.NumberFormat`, so separators follow the viewer's locale.
 - **Summary** — duration, headcount, cost per person, and a copyable one-liner
   for pasting into Slack.
+- **Meeting history** — name the meeting on the summary screen and it's kept, with
+  its cost, duration, headcount and the time it ended. The last 50 are listed behind
+  the ⏱ button in the header; delete one or clear the lot.
 - **Settings persist** in `localStorage`. Set it once.
 - **Keyboard-driven** — `Space` starts the meeting and then pauses/resumes it,
-  `Enter` ends it, `↑ ↓` adjust headcount, `Esc` closes settings.
+  `Enter` ends it, `↑ ↓` adjust headcount, `Esc` closes settings and backs out of
+  history.
 - **Chrome extension** — the same app as a toolbar popup and a side panel, so the
   counter stays visible next to your call.
 - **Zero dependencies.** Three files, no build step, no npm install, no tracking,
@@ -123,8 +127,24 @@ Open the ⚙︎ settings sheet to change:
 | Currency | ILS | Drives formatting everywhere in the app |
 | Working hours per month | 182 | Use ~173 for a 40-hour week |
 
-Settings are stored under the `mct.settings.v2` key in `localStorage`, and the
-meeting in progress under `mct.session.v1`. Neither ever leaves the browser.
+Settings are stored under the `mct.settings.v2` key in `localStorage`, the meeting
+in progress under `mct.session.v1`, and past meetings under `mct.history.v1`. None of
+it ever leaves the browser.
+
+## Meeting history
+
+Ending a meeting files it away. The summary screen has a **Name this meeting** field —
+type into it and the entry is renamed as you go; leave it blank and it's listed as
+*Untitled meeting*. The ⏱ button in the header opens the list, newest first.
+
+Each entry keeps the cost, duration, headcount and end time **as they were when the
+meeting ended**, in the currency that was set at the time. Changing your salary or
+currency later re-prices the next meeting, never a past one — which is also why the
+list totals each currency separately instead of adding them together.
+
+The last 50 meetings are kept; older ones fall off the end. Delete a single entry
+with the 🗑 button on its row, or **Clear all** to empty the list — that one takes
+two taps, because there is no undo.
 
 ## Browser support
 
