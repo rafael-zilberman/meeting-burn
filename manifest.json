@@ -4,11 +4,20 @@
   "version": "1.2.0",
   "description": "Watch your meeting burn money in real time. Reads the meeting you're in from your calendar, if you connect one.",
   "minimum_chrome_version": "114",
-  "permissions": ["sidePanel", "identity"],
-  "host_permissions": ["https://www.googleapis.com/"],
+  "permissions": [
+    "sidePanel",
+    "identity",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://www.googleapis.com/"
+  ],
   "oauth2": {
     "client_id": "REPLACE_WITH_YOUR_CLIENT_ID.apps.googleusercontent.com",
-    "scopes": ["https://www.googleapis.com/auth/calendar.events.readonly"]
+    "scopes": [
+      "https://www.googleapis.com/auth/calendar.events.readonly"
+    ]
   },
   "action": {
     "default_title": "Meeting Burn",

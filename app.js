@@ -233,7 +233,7 @@
     setPendingName("");
     show("viewSetup");
     renderPeople();
-    calRefresh(false);   // the next meeting may already have started
+    calLook(false);   // the next meeting may already have started
   });
 
   $("copy").addEventListener("click", async e => {
@@ -502,6 +502,7 @@
       title: String(x.e.summary || "Untitled event").replace(/\s+/g, " ").trim().slice(0, 60),
       at: x.start,
       people: calHeadcount(x.e),
+      from: "api",
     }));
   }
 
@@ -522,8 +523,12 @@
     // The headcount is prefilled for this meeting but deliberately not saved:
     // the calendar fills in a run, it doesn't rewrite the default you chose.
     if (e.people) { people = e.people; renderPeople(); }
-    calMeta = (e.people ? e.people + " accepted · " : "") + hhmm.format(new Date(e.at)) +
-      (calEvents.length > 1 ? ` · ${calIndex + 1}/${calEvents.length}` : "");
+    const bits = [];
+    if (e.people) bits.push(e.people + (e.from === "tab" ? " guests" : " accepted"));
+    if (e.at) bits.push(hhmm.format(new Date(e.at)));
+    if (e.from === "tab") bits.push("from this tab");
+    if (calEvents.length > 1) bits.push(`${calIndex + 1}/${calEvents.length}`);
+    calMeta = bits.join(" · ");
     setPendingName(e.title);
   }
 
@@ -544,6 +549,112 @@
     syncCalRow();
   }
 
+
+  /* ───────── the calendar tab you're looking at ─────────
+     A fallback for when the API can't answer: no OAuth client configured, not
+     connected, or the event lives on a calendar the `primary` query doesn't
+     cover. If the tab you had open when you clicked the toolbar icon is Google
+     Calendar, the page itself is asked instead.
+
+     This needs no host permission and no content script. `activeTab` grants
+     access to exactly one tab, only because you clicked the icon, and only
+     until the popup closes; the reading function below is injected from this
+     file, so there is still no fourth file in the repo. The side panel gets no
+     such grant, so there it simply finds nothing. */
+  const TAB_HOST = "calendar.google.com";
+  const HAS_SCRIPTING = typeof chrome !== "undefined" && !!(chrome.scripting && chrome.tabs);
+
+  // ⚠ Runs inside the Google Calendar page, not here. It is serialised and
+  // injected, so it can see nothing from this file and must stay standalone.
+  // Everything it returns is page text: data, never instructions, and the
+  // caller caps and escapes it like any other untrusted string.
+  function readCalendarPage(){
+    const clean = s => String(s == null ? "" : s).replace(/\s+/g, " ").trim();
+    const now = new Date();
+
+    // "10:00 – 11:30am", "10 – 11am", "14:00 – 15:30". An am/pm at the end
+    // applies to both halves unless each carries its own. Anything this can't
+    // read confidently is skipped rather than guessed at.
+    const TIMES = /(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?\s*[–—-]\s*(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?|(\d{1,2}):(\d{2})\s*[–—-]\s*(\d{1,2}):(\d{2})/i;
+    const at = (h, m, ap) => {
+      h = Number(h); m = Number(m || 0);
+      if (ap) { ap = ap.toLowerCase(); if (ap === "p" && h < 12) h += 12; if (ap === "a" && h === 12) h = 0; }
+      if (!(h >= 0 && h <= 23 && m >= 0 && m <= 59)) return null;
+      const d = new Date(now); d.setHours(h, m, 0, 0); return d.getTime();
+    };
+    const span = label => {
+      const m = label.match(TIMES);
+      if (!m) return null;
+      const start = m[1] !== undefined ? at(m[1], m[2], m[3] || m[6]) : at(m[7], m[8]);
+      const end   = m[1] !== undefined ? at(m[4], m[5], m[6]) : at(m[9], m[10]);
+      return start === null || end === null || end <= start ? null : { start, end };
+    };
+
+    // An open event is the best thing on the page: it names the guest counts.
+    // Google's class names are generated and change, so this matches on roles
+    // and on the text itself.
+    const dialog = document.querySelector('[role="dialog"]');
+    if (dialog) {
+      const text = clean(dialog.innerText);
+      const yes = text.match(/(\d+)\s*yes/i) || text.match(/(\d+)\s*accepted/i);
+      const all = text.match(/(\d+)\s*guests?/i);
+      const heading = dialog.querySelector("h1, h2, [role='heading']");
+      const title = clean(heading && heading.textContent);
+      const n = Number((yes || all || [])[1] || 0);
+      if (title) return { title: title.slice(0, 60), people: n > 1 ? Math.min(200, n) : 0, at: 0 };
+    }
+
+    // Otherwise, the chip in the grid covering the current time. Headcount
+    // isn't on a chip, so this fills in the name only.
+    const chips = Array.prototype.slice.call(document.querySelectorAll("[data-eventid]"));
+    for (let i = 0; i < chips.length; i++) {
+      const label = clean(chips[i].getAttribute("aria-label") || chips[i].textContent);
+      const s = span(label);
+      if (!s || now.getTime() < s.start || now.getTime() >= s.end) continue;
+      const title = clean(label.replace(TIMES, " ").replace(/^[,·\s-]+|[,·\s-]+$/g, ""));
+      if (title) return { title: title.slice(0, 60), people: 0, at: s.start };
+    }
+    return null;
+  }
+
+  async function calTabRead(){
+    if (!HAS_SCRIPTING) return null;
+    let tab;
+    try { [tab] = await chrome.tabs.query({ active: true, currentWindow: true }); } catch { return null; }
+    // No url means no activeTab grant — the side panel, or a tab opened since
+    // the click. Nothing to read, and nothing worth reporting.
+    if (!tab || !tab.url || !tab.id) return null;
+    let host = "";
+    try { host = new URL(tab.url).hostname; } catch { return null; }
+    if (host !== TAB_HOST) return null;
+
+    let hit;
+    try {
+      const [res] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: readCalendarPage });
+      hit = res && res.result;
+    } catch { return null; }   // the grant expired, or the page refused injection
+    if (!hit || !hit.title) return null;
+
+    return {
+      title: String(hit.title).replace(/\s+/g, " ").trim().slice(0, 60),
+      at: Number(hit.at) || 0,
+      people: Math.max(0, Math.min(200, Math.floor(Number(hit.people) || 0))),
+      from: "tab",
+    };
+  }
+
+  // The API first; the tab you're on only when it came back with nothing.
+  async function calLook(interactive){
+    await calRefresh(interactive);
+    if (calEvents.length) return;
+    const row = await calTabRead();
+    if (!row) return;
+    calEvents = [row];
+    calIndex = 0;
+    if ($("viewSetup").classList.contains("active")) calApply();
+    syncCalRow();
+  }
+
   const calRow = $("calRow"), calBtn = $("calConnect"), calStatus = $("calStatus");
 
   function syncCalRow(){
@@ -560,7 +671,8 @@
       ? (calEvents.length
           ? `Connected. ${calEvents.length} event${calEvents.length === 1 ? "" : "s"} around now.`
           : "Connected. Nothing on your calendar right now.")
-      : "Fills in the headcount and the name from the meeting you're in. Read-only, checked only while this is open.";
+      : "Fills in the headcount and the name from the meeting you're in. Read-only, checked only while this is open."
+        + (HAS_SCRIPTING ? " Not connected, it still reads an event from a Google Calendar tab you're on." : "");
   }
 
   calBtn.addEventListener("click", async () => {
@@ -583,7 +695,7 @@
     calBtn.disabled = false;
     if (!token) { calStatus.textContent = "Not connected — Google didn't grant access."; return; }
     S.calendar = true; save();
-    await calRefresh(false);
+    await calLook(false);
     syncCalRow();
   });
 
@@ -691,5 +803,5 @@
   }
 
   // Nothing in progress, so ask what you're meant to be in right now.
-  if (!restored) calRefresh(false);
+  if (!restored) calLook(false);
 })();

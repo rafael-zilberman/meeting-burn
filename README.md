@@ -44,6 +44,9 @@ it's still happening, which is the only moment the information is useful.
   headcount from the people who *accepted*, and the meeting's name from the invite.
   Works for meetings in a room, not just video calls. Off by default, read-only, and
   the one thing in the app that touches the network — see [Privacy](#privacy).
+- **Or just have the calendar open** — with no account connected at all, clicking the
+  toolbar icon while you're on a Google Calendar tab reads the event straight off the
+  page. No OAuth, no network call, no host permission.
 - **Zero dependencies.** Three files, no build step, no npm install, no tracking,
   and exactly one network call — the calendar read, only if you connect one.
 
@@ -110,6 +113,27 @@ What it does with what it reads:
 - The prefilled headcount applies to that meeting only. It never overwrites the
   default you set with the `+`/`−` buttons.
 
+### Without connecting anything
+
+If you haven't set up an OAuth client — or you have, and the event lives on a calendar
+other than your primary one — there's a fallback that needs no account at all:
+
+**Open Google Calendar in a tab, then click the Meeting Burn icon.** The extension reads
+the event off the page you were looking at.
+
+- With an event open on the page, it takes the **name and the guest count**.
+- Otherwise it finds the event covering the current time in the grid and takes the
+  **name** — a grid chip doesn't show guests, so the headcount stays yours to set.
+- It only ever looks at the tab that was active when you clicked the icon, only at
+  `calendar.google.com`, and only for that moment. This uses Chrome's `activeTab`, so
+  the extension has **no standing permission for any site** — there is no content script
+  running in the background and no host permission for Google's domains.
+- The side panel doesn't get that grant (it outlives the click), so the fallback is a
+  popup feature. The connected API works in both.
+
+It's reading a page Google can redesign at any time, so treat it as a convenience that
+may quietly stop finding things. The connected API is the reliable one.
+
 ### Setting up an OAuth client
 
 The repo ships **no client ID** — an OAuth client belongs to whoever installs the
@@ -143,7 +167,12 @@ cached; removing the grant itself is done at
 The app has no backend, no analytics and no accounts. Settings, the meeting in
 progress and your history live in `localStorage` and are never sent anywhere.
 
-The one exception is the calendar read, and only once you connect it:
+Reading an open calendar tab (above) sends nothing anywhere: it runs a function inside
+the page you already have open and hands back a name and a number. There is no content
+script installed, no host permission, and nothing persists — `activeTab` lasts for the
+one click.
+
+The one exception to "no network" is the connected calendar read:
 
 - It calls `https://www.googleapis.com/calendar/v3/calendars/primary/events` and
   nothing else. `scripts/verify.py` enforces that — a second network call, or a call

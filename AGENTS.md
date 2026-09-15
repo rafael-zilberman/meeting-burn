@@ -271,11 +271,19 @@ surrounding code.
   rechecking that number.
 - Any `chrome.*` call must be guarded with `typeof chrome !== "undefined"`; the same
   code runs on the web demo where those APIs don't exist.
-- The permissions are `sidePanel` and `identity`, plus `host_permissions` for
-  `googleapis.com` — `identity` and the host entry exist only for the calendar read.
-  Don't add a content script, a service worker, or any further host permission
-  without asking — each one changes what the extension can see and what the Web Store
-  review asks for.
+- The permissions are `sidePanel`, `identity`, `activeTab` and `scripting`, plus
+  `host_permissions` for `googleapis.com`. `identity` and the host entry exist only for
+  the connected calendar read; `activeTab` + `scripting` exist only for the fallback
+  that reads an open Google Calendar tab. Don't add a content script, a service worker,
+  or any further host permission without asking — each one changes what the extension
+  can see and what the Web Store review asks for.
+- The tab fallback injects `readCalendarPage` from `app.js` with
+  `chrome.scripting.executeScript`. It is deliberately **not** a declared content
+  script: `activeTab` grants one tab, only on a toolbar click, so the extension holds
+  no standing access to any site and the repo keeps its three app files. That function
+  runs in a page we don't control — keep it standalone (it can't see anything in
+  `app.js`), and keep treating everything it returns as untrusted text: capped, clamped
+  and written with `textContent`.
 - The OAuth client ID in `manifest.json` is a placeholder on purpose; a real one
   belongs to whoever installs the extension. `app.js` treats a `REPLACE`-prefixed ID
   as "not configured" and keeps the feature off rather than failing. Don't commit a
