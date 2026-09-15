@@ -472,17 +472,15 @@
 
   const calSelf = (e, status) => (e.attendees || []).some(a => a.self && a.responseStatus === status);
 
-  // Meeting rooms accept invitations too, and a room draws no salary. Counting
-  // one would be exactly wrong for the in-person meetings this exists for.
+  // Everyone invited except the people who said no. A "maybe" turns up, and so
+  // does the guest who never answered — only an explicit decline is evidence of
+  // an empty chair. Meeting rooms are excluded whatever they answered: a room
+  // accepts invitations but draws no salary.
   function calHeadcount(e){
-    if (e.attendeesOmitted) return { people: 0, counted: "accepted" };
-    const people = (e.attendees || []).filter(a => !a.resource);
-    const yes = people.filter(a => a.responseStatus === "accepted").length;
-    // Same rule as an opened event: bill the people who accepted, but fall back
-    // to everyone invited when fewer than two have answered. Below two either
-    // way it's a block in your calendar, not a meeting.
-    const n = yes >= 2 ? yes : people.length;
-    return { people: n >= 2 ? Math.min(200, n) : 0, counted: yes >= 2 ? "accepted" : "guests" };
+    if (e.attendeesOmitted) return 0;
+    const n = (e.attendees || [])
+      .filter(a => !a.resource && a.responseStatus !== "declined").length;
+    return n >= 2 ? Math.min(200, n) : 0;   // fewer than two is a block, not a meeting
   }
 
   function calCandidates(items){
@@ -503,16 +501,12 @@
     // Only these three fields survive. Everything else the API returned —
     // attendee names, addresses, the description, the conference link — is
     // dropped here and never stored.
-    return pool.map(x => {
-      const head = calHeadcount(x.e);
-      return {
-        title: String(x.e.summary || "Untitled event").replace(/\s+/g, " ").trim().slice(0, 60),
-        at: x.start,
-        people: head.people,
-        counted: head.counted,
-        from: "api",
-      };
-    });
+    return pool.map(x => ({
+      title: String(x.e.summary || "Untitled event").replace(/\s+/g, " ").trim().slice(0, 60),
+      at: x.start,
+      people: calHeadcount(x.e),
+      from: "api",
+    }));
   }
 
   const calCache = {
@@ -533,7 +527,7 @@
     // the calendar fills in a run, it doesn't rewrite the default you chose.
     if (e.people) { people = e.people; renderPeople(); }
     const bits = [];
-    if (e.people) bits.push(e.people + " " + (e.counted === "guests" ? "invited" : "accepted"));
+    if (e.people) bits.push(e.people + " going");
     if (e.at) bits.push(hhmm.format(new Date(e.at)));
     if (e.from === "tab") bits.push("from this tab");
     if (calEvents.length > 1) bits.push(`${calIndex + 1}/${calEvents.length}`);
@@ -596,22 +590,16 @@
     const title = clean(heading && heading.textContent);
     if (!title) return null;
 
-    // "10 guests, 7 yes" → 7. "2 guests, 1 yes virtually, 1 awaiting" → 2.
-    // Accepted is the number worth billing, but plenty of people never RSVP, so
-    // when fewer than two have answered the invited count is the better guess —
-    // a real two-person meeting shouldn't come back empty just because only the
-    // organiser clicked yes. Below two either way, there's nothing to prefill.
+    // Everyone invited except the declines, same as the API read. Google tallies
+    // the event as "10 guests, 7 yes, 1 no, 2 awaiting", so the number wanted is
+    // the guests minus the noes — the awaiting and the maybes still turn up.
     const text = clean(dialog.innerText);
     const num = re => { const m = text.match(re); return m ? Number(m[1]) : 0; };
-    const yes = num(/(\d+)\s*yes/i) || num(/(\d+)\s*accepted/i);
     const guests = num(/(\d+)\s*guests?/i);
-    const people = yes >= 2 ? yes : guests;
+    const no = num(/(\d+)\s*no\b/i) || num(/(\d+)\s*declined/i);
+    const people = guests - no;
 
-    return {
-      title: title.slice(0, 60),
-      people: people >= 2 ? Math.min(200, people) : 0,
-      counted: yes >= 2 ? "accepted" : "guests",
-    };
+    return { title: title.slice(0, 60), people: people >= 2 ? Math.min(200, people) : 0 };
   }
 
   async function calTabRead(){
@@ -636,7 +624,6 @@
       title: String(hit.title).replace(/\s+/g, " ").trim().slice(0, 60),
       at: 0,   // an open event doesn't show its date; only the API supplies a time
       people: Math.max(0, Math.min(200, Math.floor(Number(hit.people) || 0))),
-      counted: hit.counted === "guests" ? "guests" : "accepted",
       from: "tab",
     };
   }

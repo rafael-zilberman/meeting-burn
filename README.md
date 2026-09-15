@@ -41,7 +41,7 @@ it's still happening, which is the only moment the information is useful.
 - **Chrome extension** — the same app as a toolbar popup and a side panel, so the
   counter stays visible next to your call.
 - **Calendar prefill** — connect Google Calendar and the extension fills in the
-  headcount from the people who *accepted*, and the meeting's name from the invite.
+  headcount from everyone who hasn't declined, and the meeting's name from the invite.
   Works for meetings in a room, not just video calls. Off by default, read-only, and
   the one thing in the app that touches the network — see [Privacy](#privacy).
 - **Or just have the calendar open** — with no account connected at all, clicking the
@@ -105,11 +105,10 @@ never tries.
 
 What it does with what it reads:
 
-- The headcount is the number of attendees whose response is *accepted*, **excluding
-  meeting rooms** — a room accepts invitations too, and a room draws no salary. When
-  fewer than two people have actually answered, it falls back to the number invited,
-  since plenty of meetings run with nobody having clicked *Yes*. The chip says which
-  of the two it used.
+- The headcount is **everyone invited except the people who declined**. A *maybe* turns
+  up and so does the guest who never answered — only an explicit no is evidence of an
+  empty chair. Meeting rooms are excluded whatever they answered: a room accepts
+  invitations but draws no salary.
 - If several events overlap, the one you accepted wins, then the shorter one. Tap the
   chip to cycle through the others.
 - All-day entries and meetings you declined are ignored.
