@@ -20,13 +20,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   written onto the history entry when it ends, where the summary screen still renames
   it. A prefilled headcount applies to that meeting only and never overwrites your
   default.
-- **A fallback that needs no account.** With nothing connected, clicking the toolbar
-  icon while you're on a Google Calendar tab reads the event off the page — the name and
-  guest count from an open event, or the name of the event covering the current time in
-  the grid. It also covers events on calendars other than your primary one, which the
-  API read doesn't ask about. This uses `activeTab`, so the extension holds no standing
-  access to any site, runs no content script, and makes no network call; it's a popup
-  feature, since the side panel gets no such grant.
+- **A fallback that needs no account.** With nothing connected, open an event on a
+  Google Calendar tab and click the toolbar icon: its name and guest count are read
+  straight off the page. It also covers events on calendars other than your primary one,
+  which the API read doesn't ask about. This uses `activeTab`, so the extension holds no
+  standing access to any site, runs no content script, and makes no network call; it's a
+  popup feature, since the side panel gets no such grant.
+
+### Fixed
+
+- **The calendar-tab fallback could prefill an event from the wrong day.** In a week
+  view it scanned every event chip on screen and matched on the time of day alone, with
+  no notion of which day a chip belonged to — so yesterday's 11am block was offered as
+  today's meeting, with its name mangled by a time the label carried twice in two
+  formats. The grid scan is gone: the fallback now reads only an event you have opened.
 - Calendar prefill is **off until you turn it on**, read-only, and extension-only; the
   web demo has no way to do OAuth and never tries. The repo ships no OAuth client ID —
   see "Google Calendar" in the README for the ten-minute setup.
