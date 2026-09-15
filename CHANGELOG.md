@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A meeting where nobody had clicked *Yes* got no headcount at all.** Both the API
+  read and the opened-event read counted only *accepted* attendees and ignored anything
+  below two, so a two-person meeting whose guest had not responded came back empty. They
+  now fall back to the number invited, and the chip says whether it's showing accepted or
+  invited.
 - **The calendar-tab fallback could prefill an event from the wrong day.** In a week
   view it scanned every event chip on screen and matched on the time of day alone, with
   no notion of which day a chip belonged to — so yesterday's 11am block was offered as

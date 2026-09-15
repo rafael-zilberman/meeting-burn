@@ -106,7 +106,10 @@ never tries.
 What it does with what it reads:
 
 - The headcount is the number of attendees whose response is *accepted*, **excluding
-  meeting rooms** — a room accepts invitations too, and a room draws no salary.
+  meeting rooms** — a room accepts invitations too, and a room draws no salary. When
+  fewer than two people have actually answered, it falls back to the number invited,
+  since plenty of meetings run with nobody having clicked *Yes*. The chip says which
+  of the two it used.
 - If several events overlap, the one you accepted wins, then the shorter one. Tap the
   chip to cycle through the others.
 - All-day entries and meetings you declined are ignored.
