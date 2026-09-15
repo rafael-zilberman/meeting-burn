@@ -9,6 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Google Calendar prefill.** Connect a calendar in the extension's settings and the
+  setup screen fills in the headcount from the people who *accepted* the invite, and
+  the meeting's name from the event. It asks your calendar rather than your tabs, so
+  it works for a meeting in a room as well as a video call. Meeting rooms are excluded
+  from the count — a room accepts invitations but draws no salary. Overlapping
+  invitations are offered newest-accepted-first and the chip cycles through the rest;
+  all-day entries and meetings you declined are skipped.
+- The event's name rides through the meeting — shown above the running counter, and
+  written onto the history entry when it ends, where the summary screen still renames
+  it. A prefilled headcount applies to that meeting only and never overwrites your
+  default.
+- **A fallback that needs no account.** With nothing connected, clicking the toolbar
+  icon while you're on a Google Calendar tab reads the event off the page — the name and
+  guest count from an open event, or the name of the event covering the current time in
+  the grid. It also covers events on calendars other than your primary one, which the
+  API read doesn't ask about. This uses `activeTab`, so the extension holds no standing
+  access to any site, runs no content script, and makes no network call; it's a popup
+  feature, since the side panel gets no such grant.
+- Calendar prefill is **off until you turn it on**, read-only, and extension-only; the
+  web demo has no way to do OAuth and never tries. The repo ships no OAuth client ID —
+  see "Google Calendar" in the README for the ten-minute setup.
+
+### Changed
+
+- **The app now makes one network call.** It previously made none, and the README said
+  so. Connecting a calendar calls `googleapis.com` and nothing else: `verify.py` now
+  enforces "exactly one `fetch()`, in `app.js`, through `CAL_ENDPOINT`, and no other
+  absolute URL in the script" rather than banning `fetch()` outright. The API reply is
+  reduced to a title, a start time and a count before anything is cached — attendee
+  names and addresses are counted and discarded. See "Privacy" in the README.
+- The extension now asks for `identity`, `activeTab`, `scripting` and `googleapis.com`
+  alongside `sidePanel`. The first and last are used only by the connected calendar
+  read; `activeTab` and `scripting` only by the open-tab fallback.
+
 - **Meeting history.** Ending a meeting files it away, and the summary screen now has
   a *Name this meeting* field that renames the entry as you type. A ⏱ button in the
   header opens the list — newest first, with the cost, duration, headcount and end

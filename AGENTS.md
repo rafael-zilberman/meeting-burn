@@ -38,9 +38,16 @@ CHANGELOG.md            Keep a Changelog format
 ### The hard rules
 
 **1. Never add a dependency, a build step, or an external resource.** No CDN script,
-no CDN stylesheet, no Google Font, no `fetch()`, no npm. Local relative `href`/`src`
-to a file in this repo is the only kind allowed. `scripts/verify.py` enforces this
-and CI will fail the PR.
+no CDN stylesheet, no Google Font, no npm. Local relative `href`/`src` to a file in
+this repo is the only kind allowed. `scripts/verify.py` enforces this and CI will
+fail the PR.
+
+There is exactly **one** network call in the app: the Google Calendar read, from
+`app.js`, through the `CAL_ENDPOINT` constant. `verify.py` checks that it is the only
+`fetch()`, that it lives in `app.js`, and that no other absolute URL appears in the
+script. **Don't add a second one.** If a feature seems to need one, that is the
+conversation to have first — the single call is what keeps the privacy section in the
+README short enough to be worth reading.
 
 **2. Never put script back inline in `index.html`.** Chrome's MV3 content security
 policy blocks inline `<script>` and inline event handlers on extension pages, so an
@@ -264,9 +271,23 @@ surrounding code.
   rechecking that number.
 - Any `chrome.*` call must be guarded with `typeof chrome !== "undefined"`; the same
   code runs on the web demo where those APIs don't exist.
-- `sidePanel` is the only permission. Don't add host permissions, a content script,
-  or a service worker without asking — each one changes what the extension can see
-  and what the Web Store review asks for.
+- The permissions are `sidePanel`, `identity`, `activeTab` and `scripting`, plus
+  `host_permissions` for `googleapis.com`. `identity` and the host entry exist only for
+  the connected calendar read; `activeTab` + `scripting` exist only for the fallback
+  that reads an open Google Calendar tab. Don't add a content script, a service worker,
+  or any further host permission without asking — each one changes what the extension
+  can see and what the Web Store review asks for.
+- The tab fallback injects `readCalendarPage` from `app.js` with
+  `chrome.scripting.executeScript`. It is deliberately **not** a declared content
+  script: `activeTab` grants one tab, only on a toolbar click, so the extension holds
+  no standing access to any site and the repo keeps its three app files. That function
+  runs in a page we don't control — keep it standalone (it can't see anything in
+  `app.js`), and keep treating everything it returns as untrusted text: capped, clamped
+  and written with `textContent`.
+- The OAuth client ID in `manifest.json` is a placeholder on purpose; a real one
+  belongs to whoever installs the extension. `app.js` treats a `REPLACE`-prefixed ID
+  as "not configured" and keeps the feature off rather than failing. Don't commit a
+  real client ID.
 - Icons under `icons/` were generated once and committed. Replacing them is fine;
   adding a build step that generates them is not.
 
@@ -347,11 +368,13 @@ always produces a byte-identical archive. Keep it that way.
 ## 10. Scope boundaries
 
 **In scope:** meeting history, cost breakdowns, sharing, currencies, accessibility,
-performance, docs, the extension surfaces, release packaging.
+performance, docs, the extension surfaces, release packaging, and the existing
+read-only calendar prefill.
 
 **Out of scope — don't build these, propose them first:** accounts, a backend,
-analytics or telemetry of any kind, anything that sends data off the device, and
-anything that needs a build step or grows the file count (see the hard rules in §1).
+analytics or telemetry of any kind, anything that sends data off the device *other
+than the one calendar read*, a second network call of any kind, and anything that
+needs a build step or grows the file count (see the hard rules in §1).
 
 **Never do without being asked:** merge a PR, push to `main`, create a release or
 tag by hand, change repository settings or branch protection, force-push anything,

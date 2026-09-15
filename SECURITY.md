@@ -16,9 +16,11 @@ something I'm fixing and roughly when.
 
 ## Scope
 
-This app runs entirely in your browser. It has no backend, makes no network
-requests, and stores nothing beyond a small settings object in `localStorage`.
-That rules out most of what people usually report.
+This app runs entirely in your browser. It has no backend and stores nothing beyond
+a small settings object, your meeting history and a short-lived calendar cache in
+`localStorage`. It makes one network request — a read-only Google Calendar lookup,
+and only if you connect a calendar in the extension. That rules out most of what
+people usually report.
 
 Genuinely in scope:
 

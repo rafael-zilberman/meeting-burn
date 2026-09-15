@@ -145,6 +145,37 @@ header{ display:flex; align-items:center; gap:10px; margin-bottom:30px; position
 .btn.ghost:hover{ color:var(--ink); background:var(--glass-2); box-shadow:0 0 0 1px rgba(255,255,255,.2) inset; transform:none; }
 .btn svg{ width:18px; height:18px; }
 
+/* ───────────────────────── the meeting you're in ───────────────────────── */
+/* The chip on the setup view naming the calendar event the headcount and the
+   name were taken from, and the same name above the running counter. Both are
+   hidden unless a calendar actually answered. */
+.invite{ display:flex; align-items:center; gap:8px; margin:0 0 18px;
+  padding:9px 9px 9px 13px; border-radius:var(--r-md);
+  border:1px solid rgba(45,212,191,.28); background:rgba(45,212,191,.09);
+  animation:inviteIn .45s var(--ease-out) both; }
+.invite[hidden]{ display:none; }
+@keyframes inviteIn{ from{ opacity:0; transform:translateY(-6px) } to{ opacity:1; transform:none } }
+.invite-main{ flex:1; min-width:0; display:block; text-align:left; cursor:pointer;
+  border:0; background:none; padding:0; font-family:inherit; color:inherit; }
+.invite-main:disabled{ cursor:default; }
+.invite-title{ display:block; font-size:13.5px; font-weight:600; color:var(--ink);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.invite-meta{ display:block; margin-top:2px; font-size:11px; color:var(--teal);
+  font-variant-numeric:tabular-nums; }
+.invite-clear{ flex:none; width:28px; height:28px; border-radius:9px; cursor:pointer;
+  display:grid; place-items:center; font-size:17px; line-height:1;
+  border:1px solid transparent; background:none; color:var(--ink-faint);
+  font-family:inherit; transition:color .2s, background .2s, border-color .2s; }
+.invite-clear:hover{ color:var(--ink); background:var(--glass-2); border-color:var(--stroke); }
+
+.run-title{ text-align:center; font-size:13.5px; font-weight:600; color:var(--ink-dim);
+  margin:-12px 0 16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.run-title[hidden]{ display:none; }
+
+/* connecting a calendar, in the settings sheet */
+#calRow[hidden]{ display:none; }
+#calRow .btn.ghost{ height:46px; font-size:14px; }
+
 /* ───────────────────────── running ───────────────────────── */
 .live{ display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:20px; }
 .pulse{ width:7px; height:7px; border-radius:50%; background:var(--rose); box-shadow:0 0 0 0 rgba(251,113,133,.7); animation:pulse 1.8s infinite; }
@@ -284,6 +315,8 @@ html.ext .quip{ margin:12px auto 16px; }
 html.ext .done-stats{ margin-bottom:14px; }
 html.ext .name-field{ margin-bottom:16px; }
 html.ext .name-field .input-wrap{ height:46px; }
+html.ext .invite{ margin-bottom:12px; }
+html.ext .run-title{ margin:-10px 0 12px; }
 
 @media (max-width:420px){
   .card{ padding:28px 22px 26px; border-radius:24px; }

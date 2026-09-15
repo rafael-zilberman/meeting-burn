@@ -40,8 +40,15 @@ it's still happening, which is the only moment the information is useful.
   history.
 - **Chrome extension** — the same app as a toolbar popup and a side panel, so the
   counter stays visible next to your call.
+- **Calendar prefill** — connect Google Calendar and the extension fills in the
+  headcount from the people who *accepted*, and the meeting's name from the invite.
+  Works for meetings in a room, not just video calls. Off by default, read-only, and
+  the one thing in the app that touches the network — see [Privacy](#privacy).
+- **Or just have the calendar open** — with no account connected at all, clicking the
+  toolbar icon while you're on a Google Calendar tab reads the event straight off the
+  page. No OAuth, no network call, no host permission.
 - **Zero dependencies.** Three files, no build step, no npm install, no tracking,
-  no network calls of any kind.
+  and exactly one network call — the calendar read, only if you connect one.
 
 ## Usage
 
@@ -81,8 +88,103 @@ You then get two ways to run it:
 
 Both surfaces load the same `index.html`, and settings *and the meeting in progress*
 are shared between them — start in the popup, carry on in the side panel.
-Requires Chrome 114+ (for the side panel). The extension asks for the `sidePanel`
-permission and nothing else — no host permissions, no access to any page you visit.
+Requires Chrome 114+ (for the side panel). The extension asks for `sidePanel`,
+`identity` and access to `googleapis.com` — the last two only get used if you connect
+a calendar, and neither gives it access to any page you visit.
+
+## Google Calendar
+
+Meeting Burn can read which event you're in right now and fill in the two things it
+would otherwise ask you to type: **how many people accepted**, and **what the meeting
+is called**. It works for a meeting in a room as well as a video call, because it
+asks your calendar rather than looking at your tabs.
+
+It is **off until you turn it on** (⚙︎ → *Connect Google Calendar*), it is
+**read-only**, and it is **extension-only** — the web demo has no way to do OAuth and
+never tries.
+
+What it does with what it reads:
+
+- The headcount is the number of attendees whose response is *accepted*, **excluding
+  meeting rooms** — a room accepts invitations too, and a room draws no salary.
+- If several events overlap, the one you accepted wins, then the shorter one. Tap the
+  chip to cycle through the others.
+- All-day entries and meetings you declined are ignored.
+- The prefilled headcount applies to that meeting only. It never overwrites the
+  default you set with the `+`/`−` buttons.
+
+### Without connecting anything
+
+If you haven't set up an OAuth client — or you have, and the event lives on a calendar
+other than your primary one — there's a fallback that needs no account at all:
+
+**Open Google Calendar in a tab, then click the Meeting Burn icon.** The extension reads
+the event off the page you were looking at.
+
+- With an event open on the page, it takes the **name and the guest count**.
+- Otherwise it finds the event covering the current time in the grid and takes the
+  **name** — a grid chip doesn't show guests, so the headcount stays yours to set.
+- It only ever looks at the tab that was active when you clicked the icon, only at
+  `calendar.google.com`, and only for that moment. This uses Chrome's `activeTab`, so
+  the extension has **no standing permission for any site** — there is no content script
+  running in the background and no host permission for Google's domains.
+- The side panel doesn't get that grant (it outlives the click), so the fallback is a
+  popup feature. The connected API works in both.
+
+It's reading a page Google can redesign at any time, so treat it as a convenience that
+may quietly stop finding things. The connected API is the reliable one.
+
+### Setting up an OAuth client
+
+The repo ships **no client ID** — an OAuth client belongs to whoever installs the
+extension, so you make your own. It takes about ten minutes:
+
+1. In the [Google Cloud console](https://console.cloud.google.com/), create a project
+   and enable the **Google Calendar API**.
+2. Configure the OAuth consent screen. Add the scope
+   `https://www.googleapis.com/auth/calendar.events.readonly` and add yourself (and
+   anyone else who'll use it) as a test user.
+3. Load the extension unpacked and copy its ID from `chrome://extensions`. To keep
+   that ID stable — and matching a Web Store build — add your extension's `key` to
+   `manifest.json`.
+4. Create an OAuth client of type **Chrome Extension**, using that ID.
+5. Put the client ID into `manifest.json` under `oauth2.client_id`, replacing
+   `REPLACE_WITH_YOUR_CLIENT_ID...`, and reload the extension.
+
+Until you do, the settings sheet says so and the feature stays quietly off.
+
+`calendar.events.readonly` is a *sensitive* scope, so an unverified client is capped
+at 100 users and shows Google's "unverified app" screen. That is fine for yourself and
+your team. Publishing this on the Web Store for strangers means going through Google's
+verification — a privacy policy URL, a verified domain and a demo video.
+
+If you'd rather revoke access later, the *Disconnect* button drops the token Chrome
+cached; removing the grant itself is done at
+[your Google account permissions](https://myaccount.google.com/permissions).
+
+## Privacy
+
+The app has no backend, no analytics and no accounts. Settings, the meeting in
+progress and your history live in `localStorage` and are never sent anywhere.
+
+Reading an open calendar tab (above) sends nothing anywhere: it runs a function inside
+the page you already have open and hands back a name and a number. There is no content
+script installed, no host permission, and nothing persists — `activeTab` lasts for the
+one click.
+
+The one exception to "no network" is the connected calendar read:
+
+- It calls `https://www.googleapis.com/calendar/v3/calendars/primary/events` and
+  nothing else. `scripts/verify.py` enforces that — a second network call, or a call
+  anywhere else, fails CI.
+- It asks only for events in the next five minutes, only while the app is open. There
+  is no background process and nothing polls.
+- The reply is reduced to a **title, a start time and a count** before anything is
+  stored. Attendee names, email addresses, descriptions and conference links are
+  counted and discarded — they never reach disk.
+- That reduced result is cached for 60 seconds under `mct.calendar.v1` so reopening
+  the popup doesn't ask again. *Disconnect* deletes it.
+- Nothing is sent to the author of this app, or to anyone but Google.
 
 ## Project structure
 
@@ -128,8 +230,8 @@ Open the ⚙︎ settings sheet to change:
 | Working hours per month | 182 | Use ~173 for a 40-hour week |
 
 Settings are stored under the `mct.settings.v2` key in `localStorage`, the meeting
-in progress under `mct.session.v1`, and past meetings under `mct.history.v1`. None of
-it ever leaves the browser.
+in progress under `mct.session.v1`, past meetings under `mct.history.v1`, and the
+60-second calendar cache under `mct.calendar.v1`. None of it ever leaves the browser.
 
 ## Meeting history
 

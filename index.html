@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#07070c" />
-<meta name="description" content="Watch your meeting burn money in real time. No build step, no dependencies, no network calls." />
+<meta name="description" content="Watch your meeting burn money in real time. No build step, no dependencies, no tracking." />
 <title>Meeting Burn · live meeting cost tracker</title>
 <link rel="stylesheet" href="app.css" />
 <script src="app.js" defer></script>
@@ -47,6 +47,13 @@
   <div class="views">
     <!-- ── SETUP ── -->
     <section class="view active" id="viewSetup">
+      <div class="invite" id="invite" hidden>
+        <button class="invite-main" id="inviteNext" type="button" aria-label="Use the next event on your calendar">
+          <span class="invite-title" id="inviteTitle"></span>
+          <span class="invite-meta" id="inviteMeta"></span>
+        </button>
+        <button class="invite-clear" id="inviteClear" type="button" aria-label="Ignore this calendar event">×</button>
+      </div>
       <div class="label" style="text-align:center">People in the room</div>
       <div class="stepper">
         <button class="step" id="minus" aria-label="Remove a person">−</button>
@@ -64,6 +71,7 @@
     <!-- ── RUNNING ── -->
     <section class="view" id="viewRun">
       <div class="live"><span class="pulse"></span><span id="liveLabel">In session</span></div>
+      <div class="run-title" id="runTitle" hidden></div>
       <div class="money" id="money"><div class="amount" id="amount">$0<span class="cents">.00</span></div></div>
       <div class="bar"><i></i></div>
       <div class="stats">
@@ -151,6 +159,12 @@
     <label class="label" for="hours">Working hours per month</label>
     <div class="input-wrap"><input id="hours" type="number" min="1" step="1" inputmode="numeric" /></div>
     <p class="hint">Default 182 — the standard Israeli work month.</p>
+  </div>
+
+  <div class="field" id="calRow" hidden>
+    <div class="label">Google Calendar</div>
+    <button class="btn ghost" id="calConnect" type="button">Connect Google Calendar</button>
+    <p class="hint" id="calStatus"></p>
   </div>
 
   <button class="btn ghost" id="closeSettings">Done</button>
