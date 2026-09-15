@@ -284,6 +284,12 @@ surrounding code.
   runs in a page we don't control — keep it standalone (it can't see anything in
   `app.js`), and keep treating everything it returns as untrusted text: capped, clamped
   and written with `textContent`.
+- It reads **only an open event dialog**. Scanning the grid for "the event happening
+  now" was shipped once and reverted: a week view renders seven days of chips, nothing
+  in a chip reliably identifies its day, and Google's labels carry the time twice in two
+  formats. It confidently prefilled yesterday's out-of-office block. Don't re-add it
+  without a signal that actually says which day a chip belongs to — a wrong headcount is
+  worse than none, since it's the number this app exists to get right.
 - The OAuth client ID in `manifest.json` is a placeholder on purpose; a real one
   belongs to whoever installs the extension. `app.js` treats a `REPLACE`-prefixed ID
   as "not configured" and keeps the feature off rather than failing. Don't commit a

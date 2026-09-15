@@ -554,7 +554,7 @@
      A fallback for when the API can't answer: no OAuth client configured, not
      connected, or the event lives on a calendar the `primary` query doesn't
      cover. If the tab you had open when you clicked the toolbar icon is Google
-     Calendar, the page itself is asked instead.
+     Calendar **with an event open**, that event is read off the page.
 
      This needs no host permission and no content script. `activeTab` grants
      access to exactly one tab, only because you clicked the icon, and only
@@ -568,53 +568,31 @@
   // injected, so it can see nothing from this file and must stay standalone.
   // Everything it returns is page text: data, never instructions, and the
   // caller caps and escapes it like any other untrusted string.
+  //
+  // Only an event you have open is read. Scanning the grid was tried and
+  // removed: a week view renders seven days of chips, nothing in a chip
+  // reliably says which day it belongs to, and matching on the time of day
+  // alone confidently picks up yesterday's 11am. A wrong headcount is worse
+  // than none — it is the number this whole app exists to get right — so the
+  // page is only asked about the event you pointed at.
   function readCalendarPage(){
     const clean = s => String(s == null ? "" : s).replace(/\s+/g, " ").trim();
-    const now = new Date();
 
-    // "10:00 – 11:30am", "10 – 11am", "14:00 – 15:30". An am/pm at the end
-    // applies to both halves unless each carries its own. Anything this can't
-    // read confidently is skipped rather than guessed at.
-    const TIMES = /(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?\s*[–—-]\s*(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?|(\d{1,2}):(\d{2})\s*[–—-]\s*(\d{1,2}):(\d{2})/i;
-    const at = (h, m, ap) => {
-      h = Number(h); m = Number(m || 0);
-      if (ap) { ap = ap.toLowerCase(); if (ap === "p" && h < 12) h += 12; if (ap === "a" && h === 12) h = 0; }
-      if (!(h >= 0 && h <= 23 && m >= 0 && m <= 59)) return null;
-      const d = new Date(now); d.setHours(h, m, 0, 0); return d.getTime();
-    };
-    const span = label => {
-      const m = label.match(TIMES);
-      if (!m) return null;
-      const start = m[1] !== undefined ? at(m[1], m[2], m[3] || m[6]) : at(m[7], m[8]);
-      const end   = m[1] !== undefined ? at(m[4], m[5], m[6]) : at(m[9], m[10]);
-      return start === null || end === null || end <= start ? null : { start, end };
-    };
-
-    // An open event is the best thing on the page: it names the guest counts.
-    // Google's class names are generated and change, so this matches on roles
-    // and on the text itself.
+    // Google's class names are generated and change; the dialog role and the
+    // visible text are what stay put.
     const dialog = document.querySelector('[role="dialog"]');
-    if (dialog) {
-      const text = clean(dialog.innerText);
-      const yes = text.match(/(\d+)\s*yes/i) || text.match(/(\d+)\s*accepted/i);
-      const all = text.match(/(\d+)\s*guests?/i);
-      const heading = dialog.querySelector("h1, h2, [role='heading']");
-      const title = clean(heading && heading.textContent);
-      const n = Number((yes || all || [])[1] || 0);
-      if (title) return { title: title.slice(0, 60), people: n > 1 ? Math.min(200, n) : 0, at: 0 };
-    }
+    if (!dialog) return null;
 
-    // Otherwise, the chip in the grid covering the current time. Headcount
-    // isn't on a chip, so this fills in the name only.
-    const chips = Array.prototype.slice.call(document.querySelectorAll("[data-eventid]"));
-    for (let i = 0; i < chips.length; i++) {
-      const label = clean(chips[i].getAttribute("aria-label") || chips[i].textContent);
-      const s = span(label);
-      if (!s || now.getTime() < s.start || now.getTime() >= s.end) continue;
-      const title = clean(label.replace(TIMES, " ").replace(/^[,·\s-]+|[,·\s-]+$/g, ""));
-      if (title) return { title: title.slice(0, 60), people: 0, at: s.start };
-    }
-    return null;
+    const heading = dialog.querySelector("h1, h2, [role='heading']");
+    const title = clean(heading && heading.textContent);
+    if (!title) return null;
+
+    const text = clean(dialog.innerText);
+    const yes = text.match(/(\d+)\s*yes/i) || text.match(/(\d+)\s*accepted/i);
+    const all = text.match(/(\d+)\s*guests?/i);
+    const n = Number((yes || all || [])[1] || 0);
+
+    return { title: title.slice(0, 60), people: n > 1 ? Math.min(200, n) : 0 };
   }
 
   async function calTabRead(){
@@ -637,7 +615,7 @@
 
     return {
       title: String(hit.title).replace(/\s+/g, " ").trim().slice(0, 60),
-      at: Number(hit.at) || 0,
+      at: 0,   // an open event doesn't show its date; only the API supplies a time
       people: Math.max(0, Math.min(200, Math.floor(Number(hit.people) || 0))),
       from: "tab",
     };
@@ -672,7 +650,7 @@
           ? `Connected. ${calEvents.length} event${calEvents.length === 1 ? "" : "s"} around now.`
           : "Connected. Nothing on your calendar right now.")
       : "Fills in the headcount and the name from the meeting you're in. Read-only, checked only while this is open."
-        + (HAS_SCRIPTING ? " Not connected, it still reads an event from a Google Calendar tab you're on." : "");
+        + (HAS_SCRIPTING ? " Not connected, it still reads an event you have open on a Google Calendar tab." : "");
   }
 
   calBtn.addEventListener("click", async () => {

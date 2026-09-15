@@ -118,12 +118,14 @@ What it does with what it reads:
 If you haven't set up an OAuth client — or you have, and the event lives on a calendar
 other than your primary one — there's a fallback that needs no account at all:
 
-**Open Google Calendar in a tab, then click the Meeting Burn icon.** The extension reads
-the event off the page you were looking at.
+**Click the event on your calendar to open it, then click the Meeting Burn icon.** The
+extension reads the name and the guest count off the event you have open.
 
-- With an event open on the page, it takes the **name and the guest count**.
-- Otherwise it finds the event covering the current time in the grid and takes the
-  **name** — a grid chip doesn't show guests, so the headcount stays yours to set.
+- It reads **only an event you have opened**, never the calendar grid. Scanning the grid
+  was tried and removed: a week view shows seven days of events at once, nothing in one
+  reliably says which day it belongs to, and matching on the time of day alone happily
+  picks up *yesterday's* 11am. A confidently wrong headcount is worse than no headcount —
+  it's the number the whole app exists to get right.
 - It only ever looks at the tab that was active when you clicked the icon, only at
   `calendar.google.com`, and only for that moment. This uses Chrome's `activeTab`, so
   the extension has **no standing permission for any site** — there is no content script
