@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Google Calendar prefill.** Connect a calendar in the extension's settings and the
-  setup screen fills in the headcount from the people who *accepted* the invite, and
+  setup screen fills in the headcount from everyone invited who hasn't declined, and
   the meeting's name from the event. It asks your calendar rather than your tabs, so
   it works for a meeting in a room as well as a video call. Meeting rooms are excluded
   from the count — a room accepts invitations but draws no salary. Overlapping
@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A meeting where nobody had clicked *Yes* got no headcount at all.** Both reads
+  counted only *accepted* attendees and ignored anything below two, so a two-person
+  meeting whose guest had not responded came back empty. The rule is now everyone
+  invited except the declines — a *maybe* and a silent guest both still turn up — and
+  the chip reads "N going".
 - **The calendar-tab fallback could prefill an event from the wrong day.** In a week
   view it scanned every event chip on screen and matched on the time of day alone, with
   no notion of which day a chip belonged to — so yesterday's 11am block was offered as

@@ -472,12 +472,15 @@
 
   const calSelf = (e, status) => (e.attendees || []).some(a => a.self && a.responseStatus === status);
 
-  // Meeting rooms accept invitations too, and a room draws no salary. Counting
-  // one would be exactly wrong for the in-person meetings this exists for.
+  // Everyone invited except the people who said no. A "maybe" turns up, and so
+  // does the guest who never answered — only an explicit decline is evidence of
+  // an empty chair. Meeting rooms are excluded whatever they answered: a room
+  // accepts invitations but draws no salary.
   function calHeadcount(e){
     if (e.attendeesOmitted) return 0;
-    const n = (e.attendees || []).filter(a => !a.resource && a.responseStatus === "accepted").length;
-    return n > 1 ? Math.min(200, n) : 0;   // one acceptance is just you; not a meeting
+    const n = (e.attendees || [])
+      .filter(a => !a.resource && a.responseStatus !== "declined").length;
+    return n >= 2 ? Math.min(200, n) : 0;   // fewer than two is a block, not a meeting
   }
 
   function calCandidates(items){
@@ -524,7 +527,7 @@
     // the calendar fills in a run, it doesn't rewrite the default you chose.
     if (e.people) { people = e.people; renderPeople(); }
     const bits = [];
-    if (e.people) bits.push(e.people + (e.from === "tab" ? " guests" : " accepted"));
+    if (e.people) bits.push(e.people + " going");
     if (e.at) bits.push(hhmm.format(new Date(e.at)));
     if (e.from === "tab") bits.push("from this tab");
     if (calEvents.length > 1) bits.push(`${calIndex + 1}/${calEvents.length}`);
@@ -587,12 +590,16 @@
     const title = clean(heading && heading.textContent);
     if (!title) return null;
 
+    // Everyone invited except the declines, same as the API read. Google tallies
+    // the event as "10 guests, 7 yes, 1 no, 2 awaiting", so the number wanted is
+    // the guests minus the noes — the awaiting and the maybes still turn up.
     const text = clean(dialog.innerText);
-    const yes = text.match(/(\d+)\s*yes/i) || text.match(/(\d+)\s*accepted/i);
-    const all = text.match(/(\d+)\s*guests?/i);
-    const n = Number((yes || all || [])[1] || 0);
+    const num = re => { const m = text.match(re); return m ? Number(m[1]) : 0; };
+    const guests = num(/(\d+)\s*guests?/i);
+    const no = num(/(\d+)\s*no\b/i) || num(/(\d+)\s*declined/i);
+    const people = guests - no;
 
-    return { title: title.slice(0, 60), people: n > 1 ? Math.min(200, n) : 0 };
+    return { title: title.slice(0, 60), people: people >= 2 ? Math.min(200, people) : 0 };
   }
 
   async function calTabRead(){
