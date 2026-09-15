@@ -6,9 +6,10 @@ Runs in CI and locally with no dependencies:
     python3 scripts/verify.py
 
 Checks that index.html is well-formed, that the app is self-contained (every
-script and stylesheet is a local file — no CDN, no font service, no network
-calls at runtime), that it stays small, and that the Chrome extension manifest
-still points at files that exist, and that the extension is packageable.
+script and stylesheet is a local file — no CDN, no font service), that the one
+network call it is allowed to make still goes where it claims to, that it stays
+small, that the Chrome extension manifest still points at files that exist, and
+that the extension is packageable.
 """
 
 from __future__ import annotations
@@ -31,6 +32,14 @@ MANIFEST = ROOT / "manifest.json"
 
 # The whole app, downloaded over a hotel wifi. Keep it honest.
 SIZE_BUDGET_KB = 150
+
+# The single network call the app is allowed to make: reading the events that are
+# on your calendar right now, from the extension, after you connect it. This is a
+# guard, not an exemption — a second call, a call from another file, or a call to
+# any other host still fails. See "Privacy" in README.md.
+CALENDAR_ENDPOINT = "https://www.googleapis.com/calendar/v3/"
+NETWORK_FILE = "app.js"
+ENDPOINT_CONST = "CAL_ENDPOINT"
 
 VOID = {
     "area", "base", "br", "col", "embed", "hr", "img", "input",
@@ -88,7 +97,6 @@ def check_self_contained(src: str) -> None:
         (r'<script[^>]+\ssrc\s*=\s*["\'](?:https?:|//)', "an external <script src=...>"),
         (r'<link[^>]+href\s*=\s*["\']https?:', "an external stylesheet or font"),
         (r'@import\s+url\(', "a CSS @import"),
-        (r'\bfetch\s*\(', "a fetch() call"),
         (r'\bXMLHttpRequest\b', "an XMLHttpRequest"),
         (r'\bnew\s+WebSocket\b', "a WebSocket"),
         (r'\bnavigator\.sendBeacon\b', "a sendBeacon call"),
@@ -97,6 +105,41 @@ def check_self_contained(src: str) -> None:
         for match in re.finditer(pattern, src, re.IGNORECASE):
             line = src.count("\n", 0, match.start()) + 1
             fail(f"line {line}: found {description} — the app must stay self-contained")
+
+
+def check_network(parts: dict[str, str]) -> None:
+    """Exactly one fetch(), in one file, to one endpoint.
+
+    The app used to make no network calls at all. It now makes one, so the check
+    changed from "none" to "that one and nothing else" rather than being dropped:
+    a fetch anywhere else, a second fetch, or a stray absolute URL in the script
+    all still fail the build.
+    """
+    calls = [
+        (name, src.count("\n", 0, match.start()) + 1, match.group(1))
+        for name, src in parts.items()
+        for match in re.finditer(r"\bfetch\s*\(([^)]*)", src)
+    ]
+    for name, line, args in calls:
+        if name != NETWORK_FILE:
+            fail(f"{name} line {line}: fetch() is only allowed in {NETWORK_FILE}")
+        elif ENDPOINT_CONST not in args:
+            fail(
+                f"{name} line {line}: fetch() must go through {ENDPOINT_CONST} — "
+                "the calendar read is the only network call this app may make"
+            )
+    if len(calls) > 1:
+        fail(f"{len(calls)} fetch() calls; the calendar read is meant to be the only one")
+
+    script = parts[NETWORK_FILE]
+    for match in re.finditer(r"""["'](https?://[^"']*)["']""", script):
+        url = match.group(1)
+        if not url.startswith(CALENDAR_ENDPOINT):
+            line = script.count("\n", 0, match.start()) + 1
+            fail(f"{NETWORK_FILE} line {line}: {url} is not {CALENDAR_ENDPOINT}")
+
+    if calls:
+        notes.append("one network call, to the calendar read")
 
 
 def check_size(parts: dict[str, str]) -> None:
@@ -209,6 +252,7 @@ def main() -> int:
         check_self_contained(text)
     check_local_assets(src)
     check_manifest(src)
+    check_network(parts)
     check_packaging()
     check_size(parts)
     check_accessibility(src, parts["app.css"])

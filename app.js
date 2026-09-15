@@ -13,7 +13,7 @@
   /* ───────── config + persistence ───────── */
   const KEY = "mct.settings.v2";
   // salary is MONTHLY; hours are working hours per MONTH
-  const DEFAULTS = { salary: 20000, currency: "ILS", hours: 182, people: 5 };
+  const DEFAULTS = { salary: 20000, currency: "ILS", hours: 182, people: 5, calendar: false };
   const CURRENCIES = [
     ["ILS","Israeli Shekel","₪"], ["USD","US Dollar","$"], ["EUR","Euro","€"],
     ["GBP","British Pound","£"], ["CAD","Canadian Dollar","$"], ["AUD","Australian Dollar","$"],
@@ -35,7 +35,7 @@
   let historyId = null;
   const loadSession = () => { try { return JSON.parse(localStorage.getItem(SKEY) || "null"); } catch { return null; } };
   const saveSession = phase => {
-    try { localStorage.setItem(SKEY, JSON.stringify({ phase, accumulated, segmentAt, paused, people, historyId })); } catch {}
+    try { localStorage.setItem(SKEY, JSON.stringify({ phase, accumulated, segmentAt, paused, people, historyId, pendingName })); } catch {}
   };
   const clearSession = () => { try { localStorage.removeItem(SKEY); } catch {} };
 
@@ -55,6 +55,7 @@
     catch { return new Intl.NumberFormat(undefined, { style:"currency", currency:"USD", minimumFractionDigits:2, maximumFractionDigits:2 }).format(v); }
   };
   const stamp = new Intl.DateTimeFormat(undefined, { month:"short", day:"numeric", hour:"numeric", minute:"2-digit" });
+  const hhmm  = new Intl.DateTimeFormat(undefined, { hour:"numeric", minute:"2-digit" });
 
   const clock = s => {
     s = Math.floor(s);
@@ -75,6 +76,11 @@
   // ever derives from wall-clock deltas, so throttled tabs stay accurate.
   let accumulated = 0, segmentAt = 0, paused = false, raf = 0, lastWhole = -1;
   const elapsedMs = () => accumulated + (paused ? 0 : Date.now() - segmentAt);
+
+  // The name this meeting will be filed under. It arrives from the calendar
+  // event you're in, rides through the meeting, and is written onto the history
+  // entry when it ends — where the summary screen takes over and edits it.
+  let pendingName = "";
 
   /* ───────── setup view ───────── */
   const elCount = $("count"), elPeople = $("people"), elRate = $("ratePreview");
@@ -137,6 +143,7 @@
     setPaused(paused);
     $("runPeople").textContent = people;
     $("perMin").textContent = FW.format(perMinute());
+    renderInvite();
     show("viewRun");
     cancelAnimationFrame(raf);
     paint();
@@ -219,7 +226,15 @@
   $("start").addEventListener("click", begin);
   $("pause").addEventListener("click", togglePause);
   $("stop").addEventListener("click", finish);
-  $("again").addEventListener("click", () => { clearSession(); people = Math.max(1, Math.min(200, Number(S.people) || 5)); show("viewSetup"); renderPeople(); });
+  $("again").addEventListener("click", () => {
+    clearSession();
+    people = Math.max(1, Math.min(200, Number(S.people) || 5));
+    calEvents = []; calIndex = 0; calMeta = "";
+    setPendingName("");
+    show("viewSetup");
+    renderPeople();
+    calRefresh(false);   // the next meeting may already have started
+  });
 
   $("copy").addEventListener("click", async e => {
     const secs = accumulated / 1000;
@@ -245,7 +260,7 @@
   function record(){
     const entry = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
-      name: "",
+      name: pendingName,
       endedAt: Date.now(),
       ms: accumulated,
       people,
@@ -265,6 +280,7 @@
     const entry = entryFor(historyId);
     if (!entry) return;
     entry.name = elName.value.trim();
+    pendingName = entry.name;
     saveHist();
   });
 
@@ -358,6 +374,219 @@
     clearTimer = setTimeout(() => { clearTimer = 0; clearBtn.textContent = "Clear all"; }, 4000);
   });
 
+  /* ───────── the meeting you're in ─────────
+     A chip on the setup view showing the event the headcount and name came
+     from, and the same name above the counter once it's running. Every string
+     here arrives from a calendar this app does not control, so all of it is set
+     with textContent and never innerHTML. */
+  const elInvite = $("invite"), elInviteTitle = $("inviteTitle"),
+        elInviteMeta = $("inviteMeta"), elInviteNext = $("inviteNext"),
+        elRunTitle = $("runTitle");
+
+  function setPendingName(name){
+    pendingName = String(name || "").replace(/\s+/g, " ").trim().slice(0, 60);
+    renderInvite();
+  }
+
+  function renderInvite(){
+    elInvite.hidden = !pendingName;
+    elInviteTitle.textContent = pendingName;
+    elInviteMeta.textContent = calMeta;
+    elInviteNext.disabled = calEvents.length < 2;
+    elRunTitle.hidden = !pendingName;
+    elRunTitle.textContent = pendingName;
+  }
+
+  $("inviteClear").addEventListener("click", () => {
+    calEvents = []; calIndex = 0; calMeta = "";
+    setPendingName("");
+  });
+
+  // Back-to-back invitations are the normal case at the times this app gets
+  // opened, so the chip cycles rather than insisting on its first guess.
+  elInviteNext.addEventListener("click", () => {
+    if (calEvents.length < 2) return;
+    calIndex = (calIndex + 1) % calEvents.length;
+    calApply();
+  });
+
+  /* ───────── google calendar ─────────
+     The only network call this app makes, and only when running as an extension
+     with a calendar connected: Chrome's identity API holds the token and one
+     read asks which events are on your calendar right now. Nothing is uploaded,
+     nothing goes anywhere but Google, and the reply is reduced to a title, a
+     start time and a count before it is cached — attendee names and addresses
+     are counted and dropped rather than written to disk.
+
+     The web demo has no chrome.*, so none of this runs there. */
+  const CAL_ENDPOINT = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
+  const CAL_KEY = "mct.calendar.v1";
+  const CAL_TTL = 60000;            // a popup opened twice in a minute asks once
+  const CAL_LOOKAHEAD = 5 * 60000;  // an event about to start already counts as now
+  const HAS_IDENTITY = typeof chrome !== "undefined" && !!(chrome.identity && chrome.runtime);
+
+  let calEvents = [];   // candidates for "the meeting you're in", best guess first
+  let calIndex = 0;
+  let calMeta = "";
+
+  // The OAuth client is per-installation and is not in the repo — see the
+  // README. Without one the feature stays quietly off instead of failing on
+  // every open.
+  function calConfigured(){
+    if (!HAS_IDENTITY) return false;
+    try {
+      const o = chrome.runtime.getManifest().oauth2;
+      return !!(o && o.client_id && !/^REPLACE/.test(o.client_id));
+    } catch { return false; }
+  }
+
+  const calToken = interactive => new Promise(resolve => {
+    chrome.identity.getAuthToken({ interactive }, token => {
+      // A refused or absent grant is an ordinary outcome here, not a failure;
+      // reading lastError is what stops Chrome logging it as one.
+      if (chrome.runtime.lastError) { void chrome.runtime.lastError.message; return resolve(null); }
+      resolve(token || null);
+    });
+  });
+
+  const calDrop = token => new Promise(resolve => chrome.identity.removeCachedAuthToken({ token }, resolve));
+
+  async function calRead(interactive){
+    const token = await calToken(interactive);
+    if (!token) return null;
+    const now = Date.now();
+    const q = new URLSearchParams({
+      timeMin: new Date(now).toISOString(),
+      timeMax: new Date(now + CAL_LOOKAHEAD).toISOString(),
+      singleEvents: "true",   // Google expands recurring events; we don't parse rules
+      orderBy: "startTime",
+      maxResults: "10",
+    });
+    let res;
+    try { res = await fetch(CAL_ENDPOINT + "?" + q, { headers: { Authorization: "Bearer " + token } }); }
+    catch { return null; }                      // offline, blocked, whatever — the app works without it
+    if (res.status === 401) { await calDrop(token); return null; }   // Chrome cached a dead token
+    if (!res.ok) return null;
+    try { return (await res.json()).items || []; } catch { return null; }
+  }
+
+  const calSelf = (e, status) => (e.attendees || []).some(a => a.self && a.responseStatus === status);
+
+  // Meeting rooms accept invitations too, and a room draws no salary. Counting
+  // one would be exactly wrong for the in-person meetings this exists for.
+  function calHeadcount(e){
+    if (e.attendeesOmitted) return 0;
+    const n = (e.attendees || []).filter(a => !a.resource && a.responseStatus === "accepted").length;
+    return n > 1 ? Math.min(200, n) : 0;   // one acceptance is just you; not a meeting
+  }
+
+  function calCandidates(items){
+    const now = Date.now();
+    const rows = items
+      // An all-day entry has a `date` rather than a `dateTime`, and is a label
+      // on the day rather than a meeting anyone is sitting in.
+      .filter(e => e.status !== "cancelled" && e.start && e.start.dateTime && !calSelf(e, "declined"))
+      .map(e => ({ e, start: Date.parse(e.start.dateTime), end: Date.parse((e.end || {}).dateTime || "") }))
+      .filter(x => Number.isFinite(x.start) && Number.isFinite(x.end));
+
+    const live = rows.filter(x => x.start <= now && now < x.end);
+    const pool = live.length ? live : rows.filter(x => x.start > now);
+    // Overlapping invitations: the one you accepted wins, then the shorter one.
+    const yes = x => (calSelf(x.e, "accepted") ? 1 : 0);
+    pool.sort((a, b) => yes(b) - yes(a) || (a.end - a.start) - (b.end - b.start) || a.start - b.start);
+
+    // Only these three fields survive. Everything else the API returned —
+    // attendee names, addresses, the description, the conference link — is
+    // dropped here and never stored.
+    return pool.map(x => ({
+      title: String(x.e.summary || "Untitled event").replace(/\s+/g, " ").trim().slice(0, 60),
+      at: x.start,
+      people: calHeadcount(x.e),
+    }));
+  }
+
+  const calCache = {
+    read(){
+      try {
+        const c = JSON.parse(localStorage.getItem(CAL_KEY) || "null");
+        return c && Date.now() - c.at < CAL_TTL && Array.isArray(c.rows) ? c.rows : null;
+      } catch { return null; }
+    },
+    write(rows){ try { localStorage.setItem(CAL_KEY, JSON.stringify({ at: Date.now(), rows })); } catch {} },
+    clear(){ try { localStorage.removeItem(CAL_KEY); } catch {} },
+  };
+
+  function calApply(){
+    const e = calEvents[calIndex];
+    if (!e) { calMeta = ""; setPendingName(""); return; }
+    // The headcount is prefilled for this meeting but deliberately not saved:
+    // the calendar fills in a run, it doesn't rewrite the default you chose.
+    if (e.people) { people = e.people; renderPeople(); }
+    calMeta = (e.people ? e.people + " accepted · " : "") + hhmm.format(new Date(e.at)) +
+      (calEvents.length > 1 ? ` · ${calIndex + 1}/${calEvents.length}` : "");
+    setPendingName(e.title);
+  }
+
+  async function calRefresh(interactive){
+    if (!calConfigured() || !S.calendar) return;
+    let rows = calCache.read();
+    if (!rows) {
+      const items = await calRead(interactive);
+      if (!items) return;
+      rows = calCandidates(items);
+      calCache.write(rows);
+    }
+    calEvents = rows;
+    calIndex = 0;
+    // Only ever fills in the setup screen. A meeting already running keeps the
+    // headcount it started with.
+    if ($("viewSetup").classList.contains("active")) calApply();
+    syncCalRow();
+  }
+
+  const calRow = $("calRow"), calBtn = $("calConnect"), calStatus = $("calStatus");
+
+  function syncCalRow(){
+    calRow.hidden = !HAS_IDENTITY;          // the web demo has no calendar to connect
+    if (!HAS_IDENTITY) return;
+    if (!calConfigured()) {
+      calBtn.hidden = true;
+      calStatus.textContent = "This build has no OAuth client configured — see the README.";
+      return;
+    }
+    calBtn.hidden = false;
+    calBtn.textContent = S.calendar ? "Disconnect" : "Connect Google Calendar";
+    calStatus.textContent = S.calendar
+      ? (calEvents.length
+          ? `Connected. ${calEvents.length} event${calEvents.length === 1 ? "" : "s"} around now.`
+          : "Connected. Nothing on your calendar right now.")
+      : "Fills in the headcount and the name from the meeting you're in. Read-only, checked only while this is open.";
+  }
+
+  calBtn.addEventListener("click", async () => {
+    if (S.calendar) {
+      S.calendar = false; save();
+      calEvents = []; calIndex = 0; calMeta = "";
+      calCache.clear();
+      setPendingName("");
+      // Drops Chrome's cached token. Revoking the grant itself is a second
+      // network call to a second endpoint, so that stays a link in the README
+      // to your Google account rather than a request from here.
+      const token = await calToken(false);
+      if (token) await calDrop(token);
+      syncCalRow();
+      return;
+    }
+    calBtn.disabled = true;
+    calStatus.textContent = "Waiting for Google…";
+    const token = await calToken(true);
+    calBtn.disabled = false;
+    if (!token) { calStatus.textContent = "Not connected — Google didn't grant access."; return; }
+    S.calendar = true; save();
+    await calRefresh(false);
+    syncCalRow();
+  });
+
   /* ───────── settings sheet ───────── */
   const sheet = $("sheet"), scrim = $("scrim");
   const elSalary = $("salary"), elCur = $("currency"), elHours = $("hours"), elSym = $("curSym");
@@ -441,6 +670,7 @@
   /* ───────── boot ───────── */
   refreshFmt();
   syncSheet();
+  syncCalRow();
   renderPeople();
 
   const restored = loadSession();
@@ -451,6 +681,7 @@
     people      = Math.max(1, Math.min(200, Number(restored.people) || people));
     lastWhole   = -1;
     historyId   = restored.historyId || null;
+    setPendingName(restored.pendingName || "");
     if (restored.phase === "run") enterRun();
     else {
       // A summary saved before history existed has no entry; give it one now.
@@ -458,4 +689,7 @@
       showDone();
     }
   }
+
+  // Nothing in progress, so ask what you're meant to be in right now.
+  if (!restored) calRefresh(false);
 })();

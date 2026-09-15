@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Google Calendar prefill.** Connect a calendar in the extension's settings and the
+  setup screen fills in the headcount from the people who *accepted* the invite, and
+  the meeting's name from the event. It asks your calendar rather than your tabs, so
+  it works for a meeting in a room as well as a video call. Meeting rooms are excluded
+  from the count — a room accepts invitations but draws no salary. Overlapping
+  invitations are offered newest-accepted-first and the chip cycles through the rest;
+  all-day entries and meetings you declined are skipped.
+- The event's name rides through the meeting — shown above the running counter, and
+  written onto the history entry when it ends, where the summary screen still renames
+  it. A prefilled headcount applies to that meeting only and never overwrites your
+  default.
+- Calendar prefill is **off until you turn it on**, read-only, and extension-only; the
+  web demo has no way to do OAuth and never tries. The repo ships no OAuth client ID —
+  see "Google Calendar" in the README for the ten-minute setup.
+
+### Changed
+
+- **The app now makes one network call.** It previously made none, and the README said
+  so. Connecting a calendar calls `googleapis.com` and nothing else: `verify.py` now
+  enforces "exactly one `fetch()`, in `app.js`, through `CAL_ENDPOINT`, and no other
+  absolute URL in the script" rather than banning `fetch()` outright. The API reply is
+  reduced to a title, a start time and a count before anything is cached — attendee
+  names and addresses are counted and discarded. See "Privacy" in the README.
+- The extension now asks for `identity` and `googleapis.com` alongside `sidePanel`.
+  Both are used only by the calendar read.
+
 - **Meeting history.** Ending a meeting files it away, and the summary screen now has
   a *Name this meeting* field that renames the entry as you type. A ⏱ button in the
   header opens the list — newest first, with the cost, duration, headcount and end
